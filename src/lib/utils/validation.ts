@@ -35,6 +35,9 @@ export const productSchema = z.object({
 		.min(3, 'SKU deve ter pelo menos 3 caracteres')
 		.max(50, 'SKU deve ter no máximo 50 caracteres')
 		.regex(/^[A-Z0-9-]+$/, 'SKU deve conter apenas letras maiúsculas, números e hífens'),
+	costPrice: z.number()
+		.min(0, 'Preço de custo deve ser positivo')
+		.max(99999.99, 'Preço muito alto'),
 	rentalPrice: z.number()
 		.min(0, 'Preço de aluguel deve ser positivo')
 		.max(99999.99, 'Preço muito alto'),

@@ -7,6 +7,7 @@ const ProductUpdateSchema = z.object({
 	name: z.string().min(1, 'Nome é obrigatório').optional(),
 	description: z.string().optional(),
 	sku: z.string().min(1, 'SKU é obrigatório').optional(),
+	costPrice: z.number().min(0, 'Preço de custo deve ser maior que 0').optional(),
 	rentalPrice: z.number().min(0, 'Preço de aluguel deve ser maior que 0').optional(),
 	salePrice: z.number().min(0, 'Preço de venda deve ser maior que 0').optional(),
 	stockQuantity: z.number().int().min(0, 'Quantidade deve ser maior ou igual a 0').optional(),

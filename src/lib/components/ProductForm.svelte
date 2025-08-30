@@ -10,6 +10,7 @@
 		name: product?.name || '',
 		description: product?.description || '',
 		sku: product?.sku || '',
+		costPrice: product?.costPrice || 0,
 		rentalPrice: product?.rentalPrice || 0,
 		salePrice: product?.salePrice || 0,
 		stockQuantity: product?.stockQuantity || 0,
@@ -45,6 +46,10 @@
 			errors.sku = 'SKU é obrigatório';
 		}
 		
+		if (formData.costPrice < 0) {
+			errors.costPrice = 'Preço de custo deve ser maior ou igual a 0';
+		}
+		
 		if (formData.rentalPrice < 0) {
 			errors.rentalPrice = 'Preço de aluguel deve ser maior ou igual a 0';
 		}
@@ -72,6 +77,7 @@
 		// Convert string values to appropriate types
 		const submitData = {
 			...formData,
+			costPrice: Number(formData.costPrice),
 			rentalPrice: Number(formData.rentalPrice),
 			salePrice: Number(formData.salePrice),
 			stockQuantity: Number(formData.stockQuantity),
@@ -225,6 +231,24 @@
 					/>
 					{#if errors.stockQuantity}
 						<p class="mt-1 text-sm text-red-600">{errors.stockQuantity}</p>
+					{/if}
+				</div>
+				
+				<!-- Cost Price -->
+				<div>
+					<label for="costPrice" class="form-label">Preço de custo (R$) *</label>
+					<input
+						id="costPrice"
+						type="number"
+						min="0"
+						step="0.01"
+						bind:value={formData.costPrice}
+						class="form-input {errors.costPrice ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+						placeholder="0,00"
+						required
+					/>
+					{#if errors.costPrice}
+						<p class="mt-1 text-sm text-red-600">{errors.costPrice}</p>
 					{/if}
 				</div>
 				

@@ -1,12 +1,14 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
+import { ProductType } from '@prisma/client';
 import { z } from 'zod';
 
 const ProductSchema = z.object({
 	name: z.string().min(1, 'Nome é obrigatório'),
 	description: z.string().optional(),
 	sku: z.string().min(1, 'SKU é obrigatório'),
+	costPrice: z.number().min(0, 'Preço de custo deve ser maior que 0'),
 	rentalPrice: z.number().min(0, 'Preço de aluguel deve ser maior que 0'),
 	salePrice: z.number().min(0, 'Preço de venda deve ser maior que 0'),
 	stockQuantity: z.number().int().min(0, 'Quantidade deve ser maior ou igual a 0'),
@@ -30,6 +32,11 @@ export const GET: RequestHandler = async ({ url }) => {
 		const limit = parseInt(url.searchParams.get('limit') || '10');
 		const skip = (page - 1) * limit;
 
+		// Validate productType if provided
+		const validProductType = productType && Object.values(ProductType).includes(productType as ProductType) 
+			? productType as ProductType 
+			: undefined;
+
 		const where = {
 			active: true,
 			...(search && {
@@ -40,7 +47,7 @@ export const GET: RequestHandler = async ({ url }) => {
 				]
 			}),
 			...(groupId && { groupId: parseInt(groupId) }),
-			...(productType && { productType }),
+			...(validProductType && { productType: validProductType }),
 			...(availableForRental !== null && { availableForRental: availableForRental === 'true' }),
 			...(availableForSale !== null && { availableForSale: availableForSale === 'true' })
 		};

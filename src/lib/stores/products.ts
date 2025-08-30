@@ -18,6 +18,7 @@ interface Product {
 	name: string;
 	description?: string;
 	sku: string;
+	costPrice: number;
 	rentalPrice: number;
 	salePrice: number;
 	stockQuantity: number;

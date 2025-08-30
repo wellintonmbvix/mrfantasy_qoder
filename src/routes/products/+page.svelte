@@ -355,6 +355,7 @@
 
 								<div class="flex justify-between items-center">
 									<div class="text-sm">
+										<div class="text-gray-900 font-medium">C: R$ {product.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
 										<div class="text-gray-900 font-medium">A: R$ {product.rentalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
 										<div class="text-gray-500">V: R$ {product.salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
 									</div>
