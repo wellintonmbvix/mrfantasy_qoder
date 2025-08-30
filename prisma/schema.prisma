@@ -173,6 +173,28 @@ model OrderPayment {
   @@map("order_payments")
 }
 
+model Company {
+  id                Int      @id @default(autoincrement())
+  razaoSocial       String   @map("razao_social")
+  nomeFantasia      String   @map("nome_fantasia")
+  endereco          String
+  numero            String
+  complemento       String?
+  bairro            String
+  cidade            String
+  estado            String
+  cep               String
+  telefone1         String   @map("telefone_1")
+  telefone2         String?  @map("telefone_2")
+  cnpj              String   @unique
+  inscricaoEstadual String?  @map("inscricao_estadual")
+  observacaoAluguel String?  @db.Text @map("observacao_aluguel")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("company")
+}
+
 // Enums
 enum UserRole {
   ADMIN

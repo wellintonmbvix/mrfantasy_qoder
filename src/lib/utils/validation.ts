@@ -144,6 +144,68 @@ export const loginSchema = z.object({
 		.min(1, 'Senha é obrigatória')
 });
 
+// Company validation schemas
+export const companySchema = z.object({
+	razaoSocial: z.string()
+		.min(2, 'Razão social deve ter pelo menos 2 caracteres')
+		.max(200, 'Razão social deve ter no máximo 200 caracteres')
+		.trim(),
+	nomeFantasia: z.string()
+		.min(2, 'Nome fantasia deve ter pelo menos 2 caracteres')
+		.max(200, 'Nome fantasia deve ter no máximo 200 caracteres')
+		.trim(),
+	endereco: z.string()
+		.min(5, 'Endereço deve ter pelo menos 5 caracteres')
+		.max(300, 'Endereço deve ter no máximo 300 caracteres')
+		.trim(),
+	numero: z.string()
+		.min(1, 'Número é obrigatório')
+		.max(20, 'Número deve ter no máximo 20 caracteres')
+		.trim(),
+	complemento: z.string()
+		.max(100, 'Complemento deve ter no máximo 100 caracteres')
+		.trim()
+		.optional(),
+	bairro: z.string()
+		.min(2, 'Bairro deve ter pelo menos 2 caracteres')
+		.max(100, 'Bairro deve ter no máximo 100 caracteres')
+		.trim(),
+	cidade: z.string()
+		.min(2, 'Cidade deve ter pelo menos 2 caracteres')
+		.max(100, 'Cidade deve ter no máximo 100 caracteres')
+		.trim(),
+	estado: z.string()
+		.length(2, 'Estado deve ter 2 caracteres (UF)')
+		.regex(/^[A-Z]{2}$/, 'Estado deve estar em formato UF (ex: SP)')
+		.trim(),
+	cep: z.string()
+		.regex(/^\d{5}-?\d{3}$/, 'CEP inválido (formato: 00000-000)')
+		.transform(val => val.replace('-', '')),
+	telefone1: z.string()
+		.min(10, 'Telefone deve ter pelo menos 10 dígitos')
+		.regex(/^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/, 'Formato de telefone inválido')
+		.transform(val => val.replace(/\D/g, '')),
+	telefone2: z.string()
+		.regex(/^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/, 'Formato de telefone inválido')
+		.transform(val => val.replace(/\D/g, ''))
+		.optional()
+		.or(z.literal('')),
+	cnpj: z.string()
+		.regex(/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/, 'CNPJ inválido')
+		.refine(isValidCNPJ, 'CNPJ inválido')
+		.transform(val => val.replace(/\D/g, '')),
+	inscricaoEstadual: z.string()
+		.max(50, 'Inscrição estadual deve ter no máximo 50 caracteres')
+		.trim()
+		.optional()
+		.or(z.literal('')),
+	observacaoAluguel: z.string()
+		.max(1000, 'Observação deve ter no máximo 1000 caracteres')
+		.trim()
+		.optional()
+		.or(z.literal(''))
+});
+
 // Phone number formatting utility
 export function formatPhone(value: string): string {
 	const cleaned = value.replace(/\D/g, '');
@@ -158,6 +220,24 @@ export function formatCPF(value: string): string {
 	const cleaned = value.replace(/\D/g, '');
 	if (cleaned.length <= 11) {
 		return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+	}
+	return value;
+}
+
+// CNPJ formatting utility
+export function formatCNPJ(value: string): string {
+	const cleaned = value.replace(/\D/g, '');
+	if (cleaned.length <= 14) {
+		return cleaned.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+	}
+	return value;
+}
+
+// CEP formatting utility
+export function formatCEP(value: string): string {
+	const cleaned = value.replace(/\D/g, '');
+	if (cleaned.length <= 8) {
+		return cleaned.replace(/(\d{5})(\d{3})/, '$1-$2');
 	}
 	return value;
 }
@@ -188,6 +268,36 @@ export function isValidCPF(cpf: string): boolean {
 	let digit2 = remainder < 2 ? 0 : 11 - remainder;
 	
 	return parseInt(cleaned[10]) === digit2;
+}
+
+// CNPJ validation utility
+export function isValidCNPJ(cnpj: string): boolean {
+	const cleaned = cnpj.replace(/\D/g, '');
+	
+	if (cleaned.length !== 14) return false;
+	if (/^(\d)\1{13}$/.test(cleaned)) return false; // All same digits
+	
+	// Calculate first verification digit
+	let sum = 0;
+	const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+	for (let i = 0; i < 12; i++) {
+		sum += parseInt(cleaned[i]) * weights1[i];
+	}
+	let remainder = sum % 11;
+	let digit1 = remainder < 2 ? 0 : 11 - remainder;
+	
+	if (parseInt(cleaned[12]) !== digit1) return false;
+	
+	// Calculate second verification digit
+	sum = 0;
+	const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+	for (let i = 0; i < 13; i++) {
+		sum += parseInt(cleaned[i]) * weights2[i];
+	}
+	remainder = sum % 11;
+	let digit2 = remainder < 2 ? 0 : 11 - remainder;
+	
+	return parseInt(cleaned[13]) === digit2;
 }
 
 // Form validation utility

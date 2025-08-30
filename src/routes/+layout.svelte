@@ -24,7 +24,17 @@
 	$: {
 		user = $authUser || data.user;
 		isAuthPage = $page.url.pathname.startsWith('/auth');
-		allNavigationItems = user?.role === 'ADMIN' ? [...navigationItems, ...adminItems] : navigationItems;
+		// Adicionar item de empresa para Admin e Manager
+		const companyItems = (user?.role === 'ADMIN' || user?.role === 'MANAGER') ? [
+			{
+				name: 'Empresa',
+				href: '/company',
+				icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 8v-4a1 1 0 011-1h2a1 1 0 011 1v4M7 21h10'
+			}
+		] : [];
+		allNavigationItems = user?.role === 'ADMIN' 
+			? [...navigationItems, ...companyItems, ...adminItems] 
+			: [...navigationItems, ...companyItems];
 	}
 
 	async function logout() {
