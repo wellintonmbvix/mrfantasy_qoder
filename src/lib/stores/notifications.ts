@@ -10,7 +10,7 @@ export interface Notification {
 function createNotificationStore() {
 	const { subscribe, set, update } = writable<Notification[]>([]);
 
-	return {
+	const store = {
 		subscribe,
 		add: (notification: Omit<Notification, 'id'>) => {
 			const id = Math.random().toString(36).substr(2, 9);
@@ -32,18 +32,22 @@ function createNotificationStore() {
 		},
 		clear: () => {
 			set([]);
-		},
+		}
+	};
+
+	return {
+		...store,
 		success: (message: string, duration?: number) => {
-			return createNotificationStore().add({ message, type: 'success', duration });
+			return store.add({ message, type: 'success', duration });
 		},
 		error: (message: string, duration?: number) => {
-			return createNotificationStore().add({ message, type: 'error', duration });
+			return store.add({ message, type: 'error', duration });
 		},
 		warning: (message: string, duration?: number) => {
-			return createNotificationStore().add({ message, type: 'warning', duration });
+			return store.add({ message, type: 'warning', duration });
 		},
 		info: (message: string, duration?: number) => {
-			return createNotificationStore().add({ message, type: 'info', duration });
+			return store.add({ message, type: 'info', duration });
 		}
 	};
 }

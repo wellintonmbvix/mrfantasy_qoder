@@ -46,6 +46,18 @@ export const load: PageServerLoad = async () => {
 
 		const monthlyRevenue = monthlyOrders.reduce((sum, order) => sum + Number(order.totalAmount), 0);
 
+		// Serialize Decimal fields to numbers
+		const serializedRecentOrders = recentOrders.map(order => ({
+			...order,
+			totalAmount: Number(order.totalAmount)
+		}));
+
+		const serializedLowStockProducts = lowStockProducts.map(product => ({
+			...product,
+			rentalPrice: Number(product.rentalPrice),
+			salePrice: Number(product.salePrice)
+		}));
+
 		return {
 			stats: {
 				totalCustomers,
@@ -53,8 +65,8 @@ export const load: PageServerLoad = async () => {
 				activeOrders,
 				monthlyRevenue
 			},
-			recentOrders,
-			lowStockProducts
+			recentOrders: serializedRecentOrders,
+			lowStockProducts: serializedLowStockProducts
 		};
 	} catch (error) {
 		console.error('Error loading dashboard data:', error);
