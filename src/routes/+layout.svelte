@@ -107,6 +107,7 @@
 							<p class="text-sm leading-5 font-medium text-white">{user?.username}</p>
 							<p class="text-xs leading-4 text-primary-300">{user?.role}</p>
 						</div>
+						<!-- svelte-ignore a11y_consider_explicit_label -->
 						<button
 							on:click={logout}
 							class="ml-auto text-primary-200 hover:text-white transition-colors"
@@ -126,6 +127,7 @@
 			<!-- Mobile menu button -->
 			<div class="bg-primary-800 px-4 py-3 flex items-center justify-between">
 				<h1 class="text-white text-lg font-bold">Mr. Fantasy</h1>
+				<!-- svelte-ignore a11y_consider_explicit_label -->
 				<button class="text-white">
 					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />

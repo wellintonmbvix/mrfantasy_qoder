@@ -8,6 +8,9 @@ interface ProductGroup {
 	createdAt: string;
 	updatedAt: string;
 	active: boolean;
+	_count?: {
+		products: number;
+	};
 }
 
 interface Product {

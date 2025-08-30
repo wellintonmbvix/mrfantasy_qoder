@@ -4,6 +4,9 @@ import type { Actions } from './$types';
 
 export const actions: Actions = {
 default: async ({ request, cookies, url }) => {
+// Clear any existing auth cookies first
+cookies.delete('auth-token', { path: '/' });
+
 const data = await request.formData();
 const email = data.get('email') as string;
 const password = data.get('password') as string;
@@ -33,13 +36,14 @@ email
 });
 }
 
-// Configurar cookie de autenticação
+// Configurar cookie de autenticação com configurações mais explícitas
 cookies.set('auth-token', authResult.token, {
 path: '/',
 httpOnly: true,
 secure: process.env.NODE_ENV === 'production',
 sameSite: 'lax',
-maxAge: 60 * 60 * 24 // 24 hours
+maxAge: 60 * 60 * 24, // 24 hours
+domain: undefined // Explicitly set to undefined for localhost
 });
 
 console.log('Form cookie set for user:', email); // Debug log

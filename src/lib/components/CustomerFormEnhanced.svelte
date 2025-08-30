@@ -101,7 +101,7 @@
 		required
 		error={getFieldError('documentNumber')}
 		formatter={formatCPF}
-		maxlength="14"
+		maxlength={14}
 		on:input={(e) => handleInput('documentNumber', e.detail.target.value)}
 	/>
 	

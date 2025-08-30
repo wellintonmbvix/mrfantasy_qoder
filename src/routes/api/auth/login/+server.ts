@@ -4,6 +4,9 @@ import { AuthService } from '$lib/server/auth.js';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	try {
+		// Clear any existing auth cookies first
+		cookies.delete('auth-token', { path: '/' });
+		
 		const { email, password } = await request.json();
 
 		if (!email || !password) {
@@ -16,13 +19,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
 		console.log('Login successful for:', email); // Debug log
 
-		// Set auth cookie
+		// Set auth cookie with more explicit settings
 		cookies.set('auth-token', result.token, {
 			path: '/',
 			httpOnly: true,
 			secure: process.env.NODE_ENV === 'production',
 			sameSite: 'lax',
-			maxAge: 60 * 60 * 24 // 24 hours
+			maxAge: 60 * 60 * 24, // 24 hours
+			domain: undefined // Explicitly set to undefined for localhost
 		});
 
 		console.log('Cookie set for user:', email); // Debug log
