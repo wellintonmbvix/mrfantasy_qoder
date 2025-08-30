@@ -16,9 +16,15 @@
 	let currentPage = 1;
 	let activeTab = 'products'; // 'products' or 'groups'
 	const itemsPerPage = 12;
-
-	$: productsData = $products;
-	$: uiState = $ui;
+	
+	// Reactive declarations
+	let productsData: any;
+	let uiState: any;
+	
+	$: {
+		productsData = $products;
+		uiState = $ui;
+	}
 
 	onMount(() => {
 		loadData();

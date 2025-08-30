@@ -2,10 +2,17 @@
 	import type { PageData } from './$types';
 
 	export let data: PageData;
-
-	$: stats = data.stats;
-	$: recentOrders = data.recentOrders;
-	$: lowStockProducts = data.lowStockProducts;
+	
+	// Reactive declarations
+	let stats: any;
+	let recentOrders: any;
+	let lowStockProducts: any;
+	
+	$: {
+		stats = data.stats;
+		recentOrders = data.recentOrders;
+		lowStockProducts = data.lowStockProducts;
+	}
 </script>
 
 <svelte:head>

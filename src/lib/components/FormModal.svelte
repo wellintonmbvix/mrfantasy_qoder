@@ -17,7 +17,12 @@
 	let touched: Record<string, boolean> = {};
 	let generalError: string = '';
 	
-	$: isValid = Object.keys(errors).length === 0 && Object.keys(touched).length > 0;
+	// Reactive declarations
+	let isValid: boolean;
+	
+	$: {
+		isValid = Object.keys(errors).length === 0 && Object.keys(touched).length > 0;
+	}
 	
 	function validateField(fieldName: string, value: any) {
 		const fieldSchema = (schema as any).shape?.[fieldName];

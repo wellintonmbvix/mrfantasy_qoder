@@ -14,8 +14,14 @@
 	let selectedPaymentMethod: any = null;
 	let loading = false;
 	
-	$: paymentMethods = data.paymentMethods;
-	$: pagination = data.pagination;
+	// Reactive declarations
+	let paymentMethods: any;
+	let pagination: any;
+	
+	$: {
+		paymentMethods = data.paymentMethods;
+		pagination = data.pagination;
+	}
 	
 	// Handle search
 	function handleSearch() {

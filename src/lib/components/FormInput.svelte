@@ -8,7 +8,7 @@
 	export let disabled: boolean = false;
 	export let error: string = '';
 	export let helpText: string = '';
-	export let autocomplete: string = '';
+	export let autocomplete: string | null | undefined = undefined;
 	export let maxlength: number | undefined = undefined;
 	export let pattern: string | undefined = undefined;
 	export let inputClass: string = '';
@@ -59,7 +59,7 @@
 		{placeholder}
 		{required}
 		{disabled}
-		{autocomplete}
+		autocomplete={autocomplete as any}
 		{maxlength}
 		{pattern}
 		class="form-input {inputClass} {hasError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"

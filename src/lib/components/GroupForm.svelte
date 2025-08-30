@@ -14,8 +14,14 @@
 	let errors: Record<string, string> = {};
 	let loading = false;
 	
-	$: isEdit = !!group;
-	$: modalTitle = isEdit ? 'Editar Grupo' : 'Novo Grupo';
+	// Reactive declarations
+	let isEdit: boolean;
+	let modalTitle: string;
+	
+	$: {
+		isEdit = !!group;
+		modalTitle = isEdit ? 'Editar Grupo' : 'Novo Grupo';
+	}
 	
 	const categories = [
 		'FANTASY',

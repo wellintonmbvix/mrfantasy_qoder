@@ -41,12 +41,26 @@
 	let showCustomerDropdown = false;
 	let showProductDropdown = false;
 	
-	$: customersData = $customers;
-	$: productsData = $products;
-	$: totalAmount = orderItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-	$: totalPayments = orderPayments.reduce((sum, payment) => sum + payment.amount, 0);
-	$: paymentBalance = totalAmount - totalPayments;
-	$: isRental = orderType === 'RENTAL';
+	// Reactive declarations
+	let customersData: any;
+	let productsData: any;
+	let totalAmount: number;
+	let totalPayments: number;
+	let paymentBalance: number;
+	let isRental: boolean;
+	let rentalDays: number;
+	
+	$: {
+		customersData = $customers;
+		productsData = $products;
+		totalAmount = orderItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+		totalPayments = orderPayments.reduce((sum, payment) => sum + payment.amount, 0);
+		paymentBalance = totalAmount - totalPayments;
+		isRental = orderType === 'RENTAL';
+		rentalDays = rentalStartDate && rentalEndDate 
+			? Math.ceil((new Date(rentalEndDate).getTime() - new Date(rentalStartDate).getTime()) / (1000 * 60 * 60 * 24))
+			: 0;
+	}
 	
 	onMount(() => {
 		loadInitialData();
@@ -267,11 +281,6 @@
 	function handleCancel() {
 		dispatch('cancel');
 	}
-	
-	// Calculate rental duration in days
-	$: rentalDays = rentalStartDate && rentalEndDate 
-		? Math.ceil((new Date(rentalEndDate).getTime() - new Date(rentalStartDate).getTime()) / (1000 * 60 * 60 * 24))
-		: 0;
 </script>
 
 <!-- Modal Backdrop -->

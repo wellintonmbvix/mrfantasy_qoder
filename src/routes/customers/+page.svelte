@@ -10,9 +10,15 @@
 	let deleteCustomerId: number | null = null;
 	let currentPage = 1;
 	const itemsPerPage = 10;
-
-	$: customersData = $customers;
-	$: uiState = $ui;
+	
+	// Reactive declarations
+	let customersData: any;
+	let uiState: any;
+	
+	$: {
+		customersData = $customers;
+		uiState = $ui;
+	}
 
 	onMount(() => {
 		loadCustomers();

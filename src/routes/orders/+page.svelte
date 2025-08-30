@@ -10,9 +10,15 @@
 	let selectedOrderType = '';
 	let currentPage = 1;
 	const itemsPerPage = 10;
-
-	$: ordersData = $orders;
-	$: uiState = $ui;
+	
+	// Reactive declarations
+	let ordersData: any;
+	let uiState: any;
+	
+	$: {
+		ordersData = $orders;
+		uiState = $ui;
+	}
 
 	onMount(() => {
 		loadOrders();

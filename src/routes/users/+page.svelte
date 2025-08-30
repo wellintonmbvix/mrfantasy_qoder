@@ -13,8 +13,13 @@
 	let loading = false;
 	let users = data.users || [];
 	let pagination = data.pagination || { page: 1, limit: 10, total: 0, pages: 0 };
-
-	$: currentPage = pagination.page;
+	
+	// Reactive declarations
+	let currentPage: number;
+	
+	$: {
+		currentPage = pagination.page;
+	}
 
 	onMount(() => {
 		// Subscribe to UI store for modal state

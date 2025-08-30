@@ -14,8 +14,14 @@
 	let errors: Record<string, string> = {};
 	let loading = false;
 	
-	$: isEdit = !!paymentMethod;
-	$: modalTitle = isEdit ? 'Editar Meio de Pagamento' : 'Novo Meio de Pagamento';
+	// Reactive declarations
+	let isEdit: boolean;
+	let modalTitle: string;
+	
+	$: {
+		isEdit = !!paymentMethod;
+		modalTitle = isEdit ? 'Editar Meio de Pagamento' : 'Novo Meio de Pagamento';
+	}
 	
 	function validateForm() {
 		errors = {};

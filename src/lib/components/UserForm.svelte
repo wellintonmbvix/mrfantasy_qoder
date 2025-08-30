@@ -19,8 +19,14 @@
 	let showPassword = false;
 	let showConfirmPassword = false;
 	
-	$: isEdit = !!user;
-	$: modalTitle = isEdit ? 'Editar Usuário' : 'Novo Usuário';
+	// Reactive declarations
+	let isEdit: boolean;
+	let modalTitle: string;
+	
+	$: {
+		isEdit = !!user;
+		modalTitle = isEdit ? 'Editar Usuário' : 'Novo Usuário';
+	}
 	
 	const roleOptions = [
 		{ value: 'EMPLOYEE', label: 'Funcionário' },

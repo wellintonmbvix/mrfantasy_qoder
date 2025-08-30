@@ -25,8 +25,14 @@
 	let errors: Record<string, string> = {};
 	let loading = false;
 	
-	$: isEdit = !!product;
-	$: modalTitle = isEdit ? 'Editar Produto' : 'Novo Produto';
+	// Reactive declarations
+	let isEdit: boolean;
+	let modalTitle: string;
+	
+	$: {
+		isEdit = !!product;
+		modalTitle = isEdit ? 'Editar Produto' : 'Novo Produto';
+	}
 	
 	function validateForm() {
 		errors = {};

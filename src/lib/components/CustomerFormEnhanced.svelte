@@ -9,9 +9,16 @@
 	
 	const dispatch = createEventDispatcher();
 	
-	$: isEdit = !!customer;
-	$: modalTitle = isEdit ? 'Editar Cliente' : 'Novo Cliente';
-	$: submitText = isEdit ? 'Atualizar Cliente' : 'Criar Cliente';
+	// Reactive declarations
+	let isEdit: boolean;
+	let modalTitle: string;
+	let submitText: string;
+	
+	$: {
+		isEdit = !!customer;
+		modalTitle = isEdit ? 'Editar Cliente' : 'Novo Cliente';
+		submitText = isEdit ? 'Atualizar Cliente' : 'Criar Cliente';
+	}
 	
 	let loading = false;
 	
@@ -62,7 +69,7 @@
 		placeholder="Digite o nome completo"
 		required
 		error={getFieldError('name')}
-		on:input={(e) => handleInput('name', e.detail.target.value)}
+		on:input={(e: CustomEvent) => handleInput('name', e.detail.target.value)}
 	/>
 	
 	<!-- Email Field -->
@@ -75,7 +82,7 @@
 		required
 		error={getFieldError('email')}
 		autocomplete="email"
-		on:input={(e) => handleInput('email', e.detail.target.value)}
+		on:input={(e: CustomEvent) => handleInput('email', e.detail.target.value)}
 	/>
 	
 	<!-- Phone Field -->
@@ -89,7 +96,7 @@
 		error={getFieldError('phone')}
 		formatter={formatPhone}
 		autocomplete="tel"
-		on:input={(e) => handleInput('phone', e.detail.target.value)}
+		on:input={(e: CustomEvent) => handleInput('phone', e.detail.target.value)}
 	/>
 	
 	<!-- Document Number Field -->
@@ -102,7 +109,7 @@
 		error={getFieldError('documentNumber')}
 		formatter={formatCPF}
 		maxlength={14}
-		on:input={(e) => handleInput('documentNumber', e.detail.target.value)}
+		on:input={(e: CustomEvent) => handleInput('documentNumber', e.detail.target.value)}
 	/>
 	
 	<!-- Address Field -->
@@ -115,6 +122,6 @@
 		error={getFieldError('address')}
 		rows={3}
 		maxlength={500}
-		on:input={(e) => handleInput('address', e.detail.target.value)}
+		on:input={(e: CustomEvent) => handleInput('address', e.detail.target.value)}
 	/>
 </FormModal>
