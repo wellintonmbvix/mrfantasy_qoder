@@ -18,6 +18,7 @@ interface UIState {
 		productForm: boolean;
 		groupForm: boolean;
 		orderForm: boolean;
+		orderDetails: boolean;
 		deleteConfirm: boolean;
 	};
 	loading: {
@@ -26,6 +27,7 @@ interface UIState {
 		products: boolean;
 		orders: boolean;
 	};
+	selectedOrderId?: number;
 }
 
 function createUIStore() {
@@ -36,6 +38,7 @@ function createUIStore() {
 			productForm: false,
 			groupForm: false,
 			orderForm: false,
+			orderDetails: false,
 			deleteConfirm: false
 		},
 		loading: {
@@ -103,6 +106,7 @@ function createUIStore() {
 					productForm: false,
 					groupForm: false,
 					orderForm: false,
+					orderDetails: false,
 					deleteConfirm: false
 				}
 			}));
@@ -112,6 +116,19 @@ function createUIStore() {
 			update(state => ({
 				...state,
 				loading: { ...state.loading, [key]: loading }
+			}));
+		},
+		// Selected Order ID
+		setSelectedOrderId: (orderId: number) => {
+			update(state => ({
+				...state,
+				selectedOrderId: orderId
+			}));
+		},
+		clearSelectedOrderId: () => {
+			update(state => ({
+				...state,
+				selectedOrderId: undefined
 			}));
 		}
 	};

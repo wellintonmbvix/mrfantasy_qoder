@@ -3,6 +3,7 @@
 	import { orders } from '$lib/stores/orders.js';
 	import { ui, notify } from '$lib/stores/ui.js';
 	import OrderForm from '$lib/components/OrderForm.svelte';
+	import OrderDetails from '$lib/components/OrderDetails.svelte';
 
 	let search = '';
 	let selectedStatus = '';
@@ -110,6 +111,11 @@
 
 	function getOrderTypeLabel(type: string) {
 		return type === 'RENTAL' ? 'Aluguel' : 'Venda';
+	}
+
+	function viewOrderDetails(orderId: number) {
+		ui.setSelectedOrderId(orderId);
+		ui.openModal('orderDetails');
 	}
 
 	function isRentalOverdue(order: any) {
@@ -318,6 +324,7 @@
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
 									<button
+										on:click={() => viewOrderDetails(order.id)}
 										class="text-primary-600 hover:text-primary-900"
 										title="Ver detalhes"
 										aria-label="Ver detalhes do pedido"
@@ -413,5 +420,13 @@
 	<OrderForm
 		on:submit={handleOrderSubmit}
 		on:cancel={() => ui.closeModal('orderForm')}
+	/>
+{/if}
+
+<!-- Order Details Modal -->
+{#if uiState.modals.orderDetails && uiState.selectedOrderId}
+	<OrderDetails
+		orderId={uiState.selectedOrderId}
+		on:close={() => ui.closeModal('orderDetails')}
 	/>
 {/if}

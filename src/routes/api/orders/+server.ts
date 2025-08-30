@@ -3,15 +3,16 @@ import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
 import { z } from 'zod';
 
+// Use consistent validation schema
 const OrderItemSchema = z.object({
-	productId: z.number().int(),
-	quantity: z.number().int().min(1),
-	unitPrice: z.number().min(0),
+	productId: z.number().int().positive('ID do produto deve ser positivo'),
+	quantity: z.number().int().min(1, 'Quantidade deve ser pelo menos 1'),
+	unitPrice: z.number().min(0, 'Preço unitário deve ser positivo'),
 	itemType: z.enum(['RENTAL', 'SALE'])
 });
 
 const OrderSchema = z.object({
-	customerId: z.number().int(),
+	customerId: z.number().int().positive('ID do cliente deve ser positivo'),
 	orderType: z.enum(['RENTAL', 'SALE']),
 	orderDate: z.string().transform((str) => new Date(str)),
 	rentalStartDate: z.string().transform((str) => new Date(str)).optional(),
@@ -37,8 +38,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 					{ customer: { email: { contains: search } } }
 				]
 			}),
-			...(status && { status }),
-			...(orderType && { orderType })
+			...(status && { status: status as any }),
+			...(orderType && { orderType: orderType as any })
 		};
 
 		const [orders, total] = await Promise.all([
@@ -99,6 +100,29 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const data = await request.json();
+		console.log('Received order data:', JSON.stringify(data, null, 2));
+		
+		// Ensure data types are correct before validation
+		if (data.items) {
+			data.items = data.items.map((item: any) => ({
+				...item,
+				productId: parseInt(item.productId),
+				quantity: parseInt(item.quantity),
+				unitPrice: parseFloat(item.unitPrice)
+			}));
+		}
+		
+		if (data.customerId) {
+			data.customerId = parseInt(data.customerId);
+		}
+		
+		// Log each item's unitPrice type after conversion
+		if (data.items) {
+			data.items.forEach((item: any, index: number) => {
+				console.log(`Item ${index} after conversion - unitPrice:`, item.unitPrice, 'Type:', typeof item.unitPrice);
+			});
+		}
+		
 		const validatedData = OrderSchema.parse(data);
 
 		// Generate order number

@@ -108,7 +108,9 @@
 	}
 	
 	function updateItemPrice(index: number, price: number) {
-		orderItems[index].unitPrice = price;
+		// Ensure price is a valid number
+		const validPrice = isNaN(price) ? 0 : price;
+		orderItems[index].unitPrice = validPrice;
 	}
 	
 	function validateForm() {
@@ -162,9 +164,9 @@
 			rentalEndDate: rentalEndDate ? new Date(rentalEndDate) : undefined,
 			notes,
 			items: orderItems.map(item => ({
-				productId: item.productId,
-				quantity: item.quantity,
-				unitPrice: item.unitPrice,
+				productId: parseInt(item.productId.toString()),
+				quantity: parseInt(item.quantity.toString()),
+				unitPrice: parseFloat(item.unitPrice.toString()),
 				itemType: item.itemType
 			}))
 		};
@@ -184,11 +186,32 @@
 </script>
 
 <!-- Modal Backdrop -->
-<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" on:click={handleCancel}>
-	<div class="relative top-4 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-lg rounded-md bg-white max-h-screen overflow-y-auto" on:click|stopPropagation>
+<div 
+	class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" 
+	on:click={handleCancel}
+	on:keydown={(e) => {
+		if (e.key === 'Escape') {
+			handleCancel();
+		}
+	}}
+	tabindex="0"
+	role="dialog"
+	aria-modal="true"
+	aria-labelledby="modal-title"
+>
+	<!-- svelte-ignore a11y-click-events-have-key-events -->
+	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+	<div 
+		class="relative top-4 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-lg rounded-md bg-white max-h-screen overflow-y-auto" 
+		on:click|stopPropagation
+		on:keydown|stopPropagation
+		tabindex="-1"
+		role="document"
+	>
 		<!-- Modal Header -->
 		<div class="flex items-center justify-between pb-4 border-b">
-			<h3 class="text-lg font-medium text-gray-900">Novo Pedido</h3>
+			<h3 id="modal-title" class="text-lg font-medium text-gray-900">Novo Pedido</h3>
+			<!-- svelte-ignore a11y_consider_explicit_label -->
 			<button
 				on:click={handleCancel}
 				class="text-gray-400 hover:text-gray-600 transition-colors"
@@ -208,6 +231,7 @@
 					
 					<!-- Order Type -->
 					<div>
+						<!-- svelte-ignore a11y_label_has_associated_control -->
 						<label class="form-label">Tipo de pedido *</label>
 						<div class="flex space-x-4">
 							<label class="flex items-center">
@@ -334,6 +358,7 @@
 					
 					<!-- Product Search -->
 					<div class="relative">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
 						<label class="form-label">Adicionar produto</label>
 						<input
 							type="text"
@@ -379,6 +404,7 @@
 											<div class="font-medium text-sm">{item.product?.name}</div>
 											<div class="text-xs text-gray-500">{item.product?.sku}</div>
 										</div>
+										<!-- svelte-ignore a11y_consider_explicit_label -->
 										<button
 											type="button"
 											on:click={() => removeItem(index)}
@@ -392,28 +418,42 @@
 									</div>
 									<div class="grid grid-cols-3 gap-2">
 										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="text-xs text-gray-600">Qtd</label>
 											<input
 												type="number"
 												min="1"
 												max={item.product?.stockQuantity}
 												value={item.quantity}
-												on:change={(e) => updateItemQuantity(index, parseInt(e.target.value))}
+												on:change={(e) => {
+													const target = e.target as HTMLInputElement;
+													if (target) {
+														updateItemQuantity(index, parseInt(target.value));
+													}
+												}}
 												class="w-full text-sm border border-gray-300 rounded px-2 py-1"
 											/>
 										</div>
 										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="text-xs text-gray-600">Preço unit.</label>
 											<input
 												type="number"
 												min="0"
 												step="0.01"
 												value={item.unitPrice}
-												on:change={(e) => updateItemPrice(index, parseFloat(e.target.value))}
+												on:change={(e) => {
+													const target = e.target as HTMLInputElement;
+													if (target) {
+														const value = parseFloat(target.value);
+														updateItemPrice(index, isNaN(value) ? 0 : value);
+													}
+												}}
 												class="w-full text-sm border border-gray-300 rounded px-2 py-1"
 											/>
 										</div>
 										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="text-xs text-gray-600">Total</label>
 											<div class="text-sm font-medium py-1">
 												R$ {(item.quantity * item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
