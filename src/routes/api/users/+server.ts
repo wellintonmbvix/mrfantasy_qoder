@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 const userSchema = z.object({
@@ -119,7 +119,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			data: {
 				username,
 				email,
-				password: hashedPassword,
+				passwordHash: hashedPassword,
 				role,
 				active: true
 			},

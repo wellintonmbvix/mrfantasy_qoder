@@ -15,26 +15,35 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
 		console.log('Login attempt for:', email); // Debug log
 
-		const result = await AuthService.login({ email, password });
+		try {
+			const result = await AuthService.login({ email, password });
+			console.log('AuthService.login successful for:', email); // Debug log
+			console.log('Generated token length:', result.token.length); // Debug log
 
-		console.log('Login successful for:', email); // Debug log
+			// Set auth cookie with more explicit settings
+			cookies.set('auth-token', result.token, {
+				path: '/',
+				httpOnly: true,
+				secure: false, // Set to false for development
+				sameSite: 'lax',
+				maxAge: 60 * 60 * 24, // 24 hours
+				domain: undefined // Explicitly set to undefined for localhost
+			});
 
-		// Set auth cookie with more explicit settings
-		cookies.set('auth-token', result.token, {
-			path: '/',
-			httpOnly: true,
-			secure: process.env.NODE_ENV === 'production',
-			sameSite: 'lax',
-			maxAge: 60 * 60 * 24, // 24 hours
-			domain: undefined // Explicitly set to undefined for localhost
-		});
+			console.log('Cookie set successfully for user:', email); // Debug log
+			
+			// Verify the cookie was set by reading it back
+			const setCookie = cookies.get('auth-token');
+			console.log('Cookie verification - can read back:', !!setCookie); // Debug log
 
-		console.log('Cookie set for user:', email); // Debug log
-
-		return json({
-			success: true,
-			user: result.user
-		});
+			return json({
+				success: true,
+				user: result.user
+			});
+		} catch (authError) {
+			console.error('AuthService.login failed:', authError); // Debug log
+			throw authError;
+		}
 	} catch (error) {
 		console.error('Login error:', error); // Debug log
 		return json(

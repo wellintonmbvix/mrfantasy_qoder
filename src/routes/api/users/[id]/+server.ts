@@ -74,7 +74,7 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 			}, { status: 400 });
 		}
 
-		const updateData = validation.data;
+		const updateData: any = validation.data;
 
 		// Check if user exists
 		const existingUser = await prisma.user.findUnique({
@@ -117,7 +117,8 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 
 		// Hash password if provided
 		if (updateData.password) {
-			updateData.password = await bcrypt.hash(updateData.password, 10);
+			updateData.passwordHash = await bcrypt.hash(updateData.password, 10);
+			delete updateData.password;
 		}
 
 		// Update user
