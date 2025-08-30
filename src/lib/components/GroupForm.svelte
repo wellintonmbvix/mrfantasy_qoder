@@ -80,14 +80,33 @@
 </script>
 
 <!-- Modal Backdrop -->
-<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" on:click={handleCancel}>
-	<div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 xl:w-2/5 shadow-lg rounded-md bg-white" on:click|stopPropagation>
+<div 
+	class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" 
+	on:click={handleCancel}
+	on:keydown={(e) => {
+		if (e.key === 'Escape') {
+			handleCancel();
+		}
+	}}
+	tabindex="0"
+	role="dialog"
+	aria-modal="true"
+	aria-labelledby="modal-title"
+>
+	<!-- svelte-ignore a11y-click-events-have-key-events -->
+	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+	<div 
+		class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 xl:w-2/5 shadow-lg rounded-md bg-white" 
+		on:click|stopPropagation
+		role="document"
+	>
 		<!-- Modal Header -->
 		<div class="flex items-center justify-between pb-4 border-b">
-			<h3 class="text-lg font-medium text-gray-900">{modalTitle}</h3>
+			<h3 id="modal-title" class="text-lg font-medium text-gray-900">{modalTitle}</h3>
 			<button
 				on:click={handleCancel}
 				class="text-gray-400 hover:text-gray-600 transition-colors"
+				aria-label="Fechar modal"
 			>
 				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

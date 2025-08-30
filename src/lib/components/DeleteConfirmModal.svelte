@@ -22,8 +22,28 @@
 </script>
 
 <!-- Modal Backdrop -->
-<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" on:click={handleCancel}>
-	<div class="relative top-20 mx-auto p-5 border w-11/12 md:w-96 shadow-lg rounded-md bg-white" on:click|stopPropagation>
+<div 
+	class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" 
+	on:click={handleCancel}
+	on:keydown={(e) => {
+		if (e.key === 'Escape') {
+			handleCancel();
+		}
+	}}
+	tabindex="0"
+	role="dialog"
+	aria-modal="true"
+	aria-labelledby="modal-title"
+>
+	<!-- svelte-ignore a11y-click-events-have-key-events -->
+	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+	<div 
+		class="relative top-20 mx-auto p-5 border w-11/12 md:w-96 shadow-lg rounded-md bg-white" 
+		on:click|stopPropagation
+		on:keydown|stopPropagation
+		tabindex="-1"
+		role="document"
+	>
 		<!-- Modal Header -->
 		<div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
 			<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,7 +53,7 @@
 		
 		<!-- Modal Body -->
 		<div class="text-center">
-			<h3 class="text-lg font-medium text-gray-900 mb-2">{title}</h3>
+			<h3 id="modal-title" class="text-lg font-medium text-gray-900 mb-2">{title}</h3>
 			<p class="text-sm text-gray-500 mb-6">{message}</p>
 		</div>
 		

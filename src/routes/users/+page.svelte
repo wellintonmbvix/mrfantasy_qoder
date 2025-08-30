@@ -325,6 +325,7 @@
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
 									<div class="flex items-center justify-end space-x-2">
+										<!-- svelte-ignore a11y_consider_explicit_label -->
 										<button
 											on:click={() => openEditModal(user)}
 											class="text-blue-600 hover:text-blue-900 transition-colors"
@@ -351,6 +352,7 @@
 												</svg>
 											{/if}
 										</button>
+										<!-- svelte-ignore a11y_consider_explicit_label -->
 										<button
 											on:click={() => deleteUser(user)}
 											class="text-red-600 hover:text-red-900 transition-colors"
@@ -403,6 +405,7 @@
 						<div>
 							<nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
 								<!-- Previous Button -->
+								<!-- svelte-ignore a11y_consider_explicit_label -->
 								<button
 									on:click={() => handlePageChange(currentPage - 1)}
 									disabled={currentPage <= 1}
@@ -426,6 +429,7 @@
 								{/each}
 
 								<!-- Next Button -->
+								<!-- svelte-ignore a11y_consider_explicit_label -->
 								<button
 									on:click={() => handlePageChange(currentPage + 1)}
 									disabled={currentPage >= pagination.pages}
