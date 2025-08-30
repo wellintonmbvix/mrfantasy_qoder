@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import type { z } from 'zod';
+	import { z } from 'zod';
 	import { validateForm } from '$lib/utils/validation.js';
 	
 	export let schema: z.ZodSchema<any>;
@@ -20,7 +20,7 @@
 	$: isValid = Object.keys(errors).length === 0 && Object.keys(touched).length > 0;
 	
 	function validateField(fieldName: string, value: any) {
-		const fieldSchema = schema.shape[fieldName];
+		const fieldSchema = (schema as any).shape?.[fieldName];
 		if (!fieldSchema) return;
 		
 		try {
@@ -52,7 +52,7 @@
 	
 	function handleSubmit() {
 		// Mark all fields as touched
-		Object.keys(schema.shape).forEach(key => {
+		Object.keys((schema as any).shape || {}).forEach(key => {
 			touched[key] = true;
 		});
 		touched = { ...touched };
@@ -84,11 +84,32 @@
 </script>
 
 <!-- Modal Backdrop -->
-<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" on:click={handleCancel}>
-	<div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 xl:w-2/5 shadow-lg rounded-md bg-white" on:click|stopPropagation>
-		<!-- Modal Header -->
+<div 
+	class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" 
+	on:click={handleCancel}
+	on:keydown={(e) => {
+		if (e.key === 'Escape') {
+			handleCancel();
+		}
+	}}
+	tabindex="0"
+	role="dialog"
+	aria-modal="true"
+	aria-labelledby="modal-title"
+>
+	<!-- svelte-ignore a11y-click-events-have-key-events -->
+	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+	<div 
+		class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 xl:w-2/5 shadow-lg rounded-md bg-white" 
+		on:click|stopPropagation
+		on:keydown|stopPropagation
+		tabindex="-1"
+		role="document"
+	>
+		<!-- Modal Header -->	
 		<div class="flex items-center justify-between pb-4 border-b">
-			<h3 class="text-lg font-medium text-gray-900">{title}</h3>
+			<h3 id="modal-title" class="text-lg font-medium text-gray-900">{title}</h3>
+			<!-- svelte-ignore a11y_consider_explicit_label -->
 			<button
 				on:click={handleCancel}
 				class="text-gray-400 hover:text-gray-600 transition-colors"
