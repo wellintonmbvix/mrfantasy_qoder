@@ -19,6 +19,17 @@
 		itemType: 'RENTAL' | 'SALE';
 	}> = [];
 	
+	// Payment methods data
+	let paymentMethods: any[] = [];
+	let orderPayments: Array<{
+		paymentMethodId: number;
+		paymentMethod?: any;
+		amount: number;
+		notes?: string;
+	}> = [];
+	let showPaymentDropdown = false;
+	let selectedPaymentMethodId = '';
+	
 	let errors: Record<string, string> = {};
 	let loading = false;
 	let searchingCustomers = false;
@@ -33,6 +44,8 @@
 	$: customersData = $customers;
 	$: productsData = $products;
 	$: totalAmount = orderItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+	$: totalPayments = orderPayments.reduce((sum, payment) => sum + payment.amount, 0);
+	$: paymentBalance = totalAmount - totalPayments;
 	$: isRental = orderType === 'RENTAL';
 	
 	onMount(() => {
@@ -43,10 +56,23 @@
 		await Promise.all([
 			customers.fetch({ limit: 50 }),
 			products.fetchProducts({ limit: 50 }),
-			products.fetchGroups()
+			products.fetchGroups(),
+			loadPaymentMethods()
 		]);
 		customersList = customersData.customers;
 		productsList = productsData.products;
+	}
+	
+	async function loadPaymentMethods() {
+		try {
+			const response = await fetch('/api/payment-methods?active=true&limit=100');
+			const data = await response.json();
+			if (response.ok) {
+				paymentMethods = data.paymentMethods || [];
+			}
+		} catch (error) {
+			console.error('Error loading payment methods:', error);
+		}
 	}
 	
 	async function searchCustomers() {
@@ -113,6 +139,45 @@
 		orderItems[index].unitPrice = validPrice;
 	}
 	
+	function addPayment() {
+		if (!selectedPaymentMethodId) return;
+		
+		const paymentMethod = paymentMethods.find(pm => pm.id === parseInt(selectedPaymentMethodId));
+		if (!paymentMethod) return;
+		
+		// Check if payment method already exists
+		const existingIndex = orderPayments.findIndex(p => p.paymentMethodId === paymentMethod.id);
+		if (existingIndex >= 0) {
+			return; // Don't add duplicate payment methods
+		}
+		
+		// Add with remaining balance or minimum amount
+		const amount = paymentBalance > 0 ? paymentBalance : 0;
+		
+		orderPayments = [...orderPayments, {
+			paymentMethodId: paymentMethod.id,
+			paymentMethod: paymentMethod,
+			amount: amount,
+			notes: ''
+		}];
+		
+		selectedPaymentMethodId = '';
+		showPaymentDropdown = false;
+	}
+	
+	function removePayment(index: number) {
+		orderPayments = orderPayments.filter((_, i) => i !== index);
+	}
+	
+	function updatePaymentAmount(index: number, amount: number) {
+		const validAmount = isNaN(amount) ? 0 : Math.max(0, amount);
+		orderPayments[index].amount = validAmount;
+	}
+	
+	function updatePaymentNotes(index: number, notes: string) {
+		orderPayments[index].notes = notes;
+	}
+	
 	function validateForm() {
 		errors = {};
 		
@@ -148,6 +213,25 @@
 			}
 		}
 		
+		// Validate payments
+		if (orderPayments.length === 0) {
+			errors.payments = 'Pelo menos um meio de pagamento é obrigatório';
+		} else if (Math.abs(paymentBalance) > 0.01) { // Allow small rounding differences
+			if (paymentBalance > 0) {
+				errors.payments = `Valor restante a pagar: R$ ${paymentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+			} else {
+				errors.payments = `Valor excedente: R$ ${Math.abs(paymentBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+			}
+		}
+		
+		// Validate individual payment amounts
+		for (const payment of orderPayments) {
+			if (payment.amount <= 0) {
+				errors.payments = 'Todos os valores de pagamento devem ser maiores que zero';
+				break;
+			}
+		}
+		
 		return Object.keys(errors).length === 0;
 	}
 	
@@ -168,6 +252,11 @@
 				quantity: parseInt(item.quantity.toString()),
 				unitPrice: parseFloat(item.unitPrice.toString()),
 				itemType: item.itemType
+			})),
+			payments: orderPayments.map(payment => ({
+				paymentMethodId: parseInt(payment.paymentMethodId.toString()),
+				amount: parseFloat(payment.amount.toString()),
+				notes: payment.notes || ''
 			}))
 		};
 		
@@ -224,7 +313,7 @@
 		
 		<!-- Modal Body -->
 		<form on:submit|preventDefault={handleSubmit} class="mt-4">
-			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			<div class="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
 				<!-- Left Column - Order Info -->
 				<div class="space-y-4">
 					<h4 class="text-md font-medium text-gray-900">Informações do Pedido</h4>
@@ -483,6 +572,134 @@
 					
 					{#if errors.items}
 						<p class="text-sm text-red-600">{errors.items}</p>
+					{/if}
+				</div>
+				
+				<!-- Third Column - Payments -->
+				<div class="space-y-4 xl:col-span-1 lg:col-span-2">
+					<h4 class="text-md font-medium text-gray-900">Meios de Pagamento</h4>
+					
+					<!-- Payment Method Selection -->
+					<div class="relative">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<label class="form-label">Adicionar meio de pagamento</label>
+						<select
+							bind:value={selectedPaymentMethodId}
+							on:change={addPayment}
+							class="form-input"
+						>
+							<option value="">Selecione um meio de pagamento</option>
+							{#each paymentMethods as paymentMethod}
+								{#if !orderPayments.find(p => p.paymentMethodId === paymentMethod.id)}
+									<option value={paymentMethod.id}>{paymentMethod.name}</option>
+								{/if}
+							{/each}
+						</select>
+					</div>
+					
+					<!-- Payment Items -->
+					{#if orderPayments.length > 0}
+						<div class="space-y-3">
+							<h5 class="text-sm font-medium text-gray-700">Pagamentos do pedido</h5>
+							{#each orderPayments as payment, index}
+								<div class="border rounded-lg p-3 bg-gray-50">
+									<div class="flex justify-between items-start mb-2">
+										<div class="flex-1">
+											<div class="font-medium text-sm">{payment.paymentMethod?.name}</div>
+											<div class="text-xs text-gray-500">{payment.paymentMethod?.description || ''}</div>
+										</div>
+										<!-- svelte-ignore a11y_consider_explicit_label -->
+										<button
+											type="button"
+											on:click={() => removePayment(index)}
+											class="text-red-600 hover:text-red-800"
+											title="Remover pagamento"
+										>
+											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+									<div class="grid grid-cols-2 gap-2">
+										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label class="text-xs text-gray-600">Valor</label>
+											<input
+												type="number"
+												min="0"
+												step="0.01"
+												max={totalAmount}
+												value={payment.amount}
+												on:change={(e) => {
+													const target = e.target as HTMLInputElement;
+													if (target) {
+														const value = parseFloat(target.value);
+														updatePaymentAmount(index, isNaN(value) ? 0 : value);
+													}
+												}}
+												class="w-full text-sm border border-gray-300 rounded px-2 py-1"
+												placeholder="0,00"
+											/>
+										</div>
+										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label class="text-xs text-gray-600">Observações</label>
+											<input
+												type="text"
+												value={payment.notes || ''}
+												on:change={(e) => {
+													const target = e.target as HTMLInputElement;
+													if (target) {
+														updatePaymentNotes(index, target.value);
+													}
+												}}
+												class="w-full text-sm border border-gray-300 rounded px-2 py-1"
+												placeholder="Opcional"
+											/>
+										</div>
+									</div>
+								</div>
+							{/each}
+							
+							<!-- Payment Summary -->
+							<div class="border-t pt-3 space-y-2">
+								<div class="flex justify-between items-center text-sm">
+									<span>Total do pedido:</span>
+									<span class="font-medium">R$ {totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+								</div>
+								<div class="flex justify-between items-center text-sm">
+									<span>Total pago:</span>
+									<span class="font-medium">R$ {totalPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+								</div>
+								<div class="flex justify-between items-center text-sm font-semibold border-t pt-2">
+									<span>Saldo:</span>
+									<span class="{paymentBalance > 0.01 ? 'text-red-600' : paymentBalance < -0.01 ? 'text-orange-600' : 'text-green-600'}">
+										R$ {paymentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+									</span>
+								</div>
+								{#if Math.abs(paymentBalance) > 0.01}
+									<div class="text-xs text-gray-500">
+										{#if paymentBalance > 0}
+											Faltam R$ {paymentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para quitar
+										{:else}
+											Valor excedente de R$ {Math.abs(paymentBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+										{/if}
+									</div>
+								{/if}
+							</div>
+						</div>
+					{:else}
+						<div class="text-center py-8 text-gray-500">
+							<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 48 48">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v2a2 2 0 002 2z" />
+							</svg>
+							<p class="mt-2">Nenhum meio de pagamento adicionado</p>
+							<p class="text-sm">Selecione os meios de pagamento acima</p>
+						</div>
+					{/if}
+					
+					{#if errors.payments}
+						<p class="text-sm text-red-600">{errors.payments}</p>
 					{/if}
 				</div>
 			</div>

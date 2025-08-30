@@ -32,6 +32,11 @@ export const GET: RequestHandler = async ({ params }) => {
 							}
 						}
 					}
+				},
+				orderPayments: {
+					include: {
+						paymentMethod: true
+					}
 				}
 			}
 		});
@@ -71,7 +76,7 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 		if (validatedData.status && validatedData.status !== currentOrder.status) {
 			if (validatedData.status === 'CANCELLED' && currentOrder.status !== 'CANCELLED') {
 				// Return items to stock
-				await prisma.$transaction(async (tx) => {
+				await prisma.$transaction(async (tx: any) => {
 					for (const item of currentOrder.orderItems) {
 						await tx.product.update({
 							where: { id: item.productId },
@@ -98,7 +103,7 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 
 			if (validatedData.status === 'RETURNED' && currentOrder.orderType === 'RENTAL') {
 				// Return rental items to stock
-				await prisma.$transaction(async (tx) => {
+				await prisma.$transaction(async (tx: any) => {
 					for (const item of currentOrder.orderItems) {
 						if (item.itemType === 'RENTAL') {
 							await tx.product.update({
@@ -145,6 +150,11 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 				orderItems: {
 					include: {
 						product: true
+					}
+				},
+				orderPayments: {
+					include: {
+						paymentMethod: true
 					}
 				}
 			}

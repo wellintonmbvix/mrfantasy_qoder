@@ -272,6 +272,61 @@
 								</div>
 							</div>
 						</div>
+						
+						<!-- Payment Methods -->
+						{#if orderData.orderPayments && orderData.orderPayments.length > 0}
+							<div class="bg-gray-50 rounded-lg p-4">
+								<h4 class="text-sm font-medium text-gray-900 mb-3">Meios de Pagamento</h4>
+								<div class="space-y-3">
+									{#each orderData.orderPayments as payment}
+										<div class="bg-white rounded-lg p-3 border">
+											<div class="flex justify-between items-start mb-2">
+												<div class="flex-1">
+													<div class="font-medium text-sm text-gray-900">{payment.paymentMethod?.name}</div>
+													{#if payment.paymentMethod?.description}
+														<div class="text-xs text-gray-500">{payment.paymentMethod.description}</div>
+													{/if}
+													{#if payment.notes}
+														<div class="text-xs text-gray-600 mt-1">Obs: {payment.notes}</div>
+													{/if}
+												</div>
+												<div class="text-right">
+													<div class="text-sm font-medium text-gray-900">
+														R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+													</div>
+												</div>
+											</div>
+										</div>
+									{/each}
+									
+									<!-- Payment Summary -->
+									<div class="border-t pt-3 mt-3">
+										<div class="flex justify-between items-center text-sm mb-1">
+											<span class="text-gray-600">Total Pago:</span>
+											<span class="font-medium text-gray-900">
+												R$ {orderData.orderPayments.reduce((sum: number, payment: any) => sum + Number(payment.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+											</span>
+										</div>
+										{#if orderData.orderPayments && orderData.orderPayments.length > 0}
+											{@const totalPaid = orderData.orderPayments.reduce((sum: number, payment: any) => sum + Number(payment.amount), 0)}
+											{@const balance = Number(orderData.totalAmount) - totalPaid}
+											<div class="flex justify-between items-center text-sm font-semibold">
+												<span>Status do Pagamento:</span>
+												<span class="{Math.abs(balance) <= 0.01 ? 'text-green-600' : balance > 0 ? 'text-red-600' : 'text-orange-600'}">
+													{#if Math.abs(balance) <= 0.01}
+														Quitado
+													{:else if balance > 0}
+														Pendente (R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+													{:else}
+														Excedente (R$ {Math.abs(balance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+													{/if}
+												</span>
+											</div>
+										{/if}
+									</div>
+								</div>
+							</div>
+						{/if}
 					</div>
 				</div>
 			{/if}

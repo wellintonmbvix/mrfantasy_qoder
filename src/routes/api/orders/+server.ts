@@ -11,6 +11,12 @@ const OrderItemSchema = z.object({
 	itemType: z.enum(['RENTAL', 'SALE'])
 });
 
+const OrderPaymentSchema = z.object({
+	paymentMethodId: z.number().int().positive('ID do meio de pagamento deve ser positivo'),
+	amount: z.number().min(0.01, 'Valor do pagamento deve ser maior que zero'),
+	notes: z.string().optional()
+});
+
 const OrderSchema = z.object({
 	customerId: z.number().int().positive('ID do cliente deve ser positivo'),
 	orderType: z.enum(['RENTAL', 'SALE']),
@@ -18,7 +24,8 @@ const OrderSchema = z.object({
 	rentalStartDate: z.string().transform((str) => new Date(str)).optional(),
 	rentalEndDate: z.string().transform((str) => new Date(str)).optional(),
 	notes: z.string().optional(),
-	items: z.array(OrderItemSchema).min(1, 'Pelo menos um item é obrigatório')
+	items: z.array(OrderItemSchema).min(1, 'Pelo menos um item é obrigatório'),
+	payments: z.array(OrderPaymentSchema).min(1, 'Pelo menos um meio de pagamento é obrigatório')
 });
 
 export const GET: RequestHandler = async ({ url, locals }) => {
@@ -70,6 +77,16 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 								}
 							}
 						}
+					},
+					orderPayments: {
+						include: {
+							paymentMethod: {
+								select: {
+									id: true,
+									name: true
+								}
+							}
+						}
 					}
 				},
 				skip,
@@ -109,6 +126,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				productId: parseInt(item.productId),
 				quantity: parseInt(item.quantity),
 				unitPrice: parseFloat(item.unitPrice)
+			}));
+		}
+		
+		if (data.payments) {
+			data.payments = data.payments.map((payment: any) => ({
+				...payment,
+				paymentMethodId: parseInt(payment.paymentMethodId),
+				amount: parseFloat(payment.amount)
 			}));
 		}
 		
@@ -169,9 +194,32 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 			totalAmount += item.unitPrice * item.quantity;
 		}
+		
+		// Validate payment methods
+		for (const payment of validatedData.payments) {
+			const paymentMethod = await prisma.paymentMethod.findUnique({
+				where: { id: payment.paymentMethodId }
+			});
+			
+			if (!paymentMethod || !paymentMethod.active) {
+				return json(
+					{ error: `Meio de pagamento ID ${payment.paymentMethodId} não encontrado ou inativo` },
+					{ status: 400 }
+				);
+			}
+		}
+		
+		// Validate payment total
+		const totalPayments = validatedData.payments.reduce((sum, payment) => sum + payment.amount, 0);
+		if (Math.abs(totalAmount - totalPayments) > 0.01) {
+			return json(
+				{ error: `Total dos pagamentos (R$ ${totalPayments.toFixed(2)}) deve ser igual ao total do pedido (R$ ${totalAmount.toFixed(2)})` },
+				{ status: 400 }
+			);
+		}
 
 		// Create order in a transaction
-		const order = await prisma.$transaction(async (tx) => {
+		const order = await prisma.$transaction(async (tx: any) => {
 			// Create the order
 			const newOrder = await tx.order.create({
 				data: {
@@ -222,6 +270,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					}
 				});
 			}
+			
+			// Create order payments
+			for (const payment of validatedData.payments) {
+				await tx.orderPayment.create({
+					data: {
+						orderId: newOrder.id,
+						paymentMethodId: payment.paymentMethodId,
+						amount: payment.amount,
+						notes: payment.notes || ''
+					}
+				});
+			}
 
 			return newOrder;
 		});
@@ -240,6 +300,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				orderItems: {
 					include: {
 						product: true
+					}
+				},
+				orderPayments: {
+					include: {
+						paymentMethod: true
 					}
 				}
 			}

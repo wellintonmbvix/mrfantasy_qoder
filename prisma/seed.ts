@@ -100,6 +100,25 @@ async function main() {
 
 	console.log('✅ Sample customer created');
 
+	// Create default payment methods
+	const paymentMethods = [
+		{ name: 'Dinheiro', description: 'Pagamento em espécie' },
+		{ name: 'PIX', description: 'Pagamento via PIX' },
+		{ name: 'Cartão de Crédito', description: 'Pagamento via cartão de crédito' },
+		{ name: 'Cartão de Débito', description: 'Pagamento via cartão de débito' },
+		{ name: 'Cheque', description: 'Pagamento via cheque' }
+	];
+
+	for (const method of paymentMethods) {
+		await prisma.paymentMethod.upsert({
+			where: { name: method.name },
+			update: {},
+			create: method
+		});
+	}
+
+	console.log('✅ Default payment methods created');
+
 	console.log('🎉 Database seeded successfully!');
 	console.log('📧 Admin login: admin@mrfantasy.com');
 	console.log('🔑 Admin password: admin123');

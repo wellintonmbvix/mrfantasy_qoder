@@ -1,0 +1,171 @@
+<script lang="ts">
+	import { createEventDispatcher } from 'svelte';
+	
+	export let paymentMethod: any = null;
+	
+	const dispatch = createEventDispatcher();
+	
+	let formData = {
+		name: paymentMethod?.name || '',
+		description: paymentMethod?.description || '',
+		active: paymentMethod?.active ?? true
+	};
+	
+	let errors: Record<string, string> = {};
+	let loading = false;
+	
+	$: isEdit = !!paymentMethod;
+	$: modalTitle = isEdit ? 'Editar Meio de Pagamento' : 'Novo Meio de Pagamento';
+	
+	function validateForm() {
+		errors = {};
+		
+		if (!formData.name.trim()) {
+			errors.name = 'Nome é obrigatório';
+		}
+		
+		return Object.keys(errors).length === 0;
+	}
+	
+	function handleSubmit() {
+		if (!validateForm()) return;
+		
+		loading = true;
+		dispatch('submit', {
+			paymentMethod: formData,
+			isEdit
+		});
+		loading = false;
+	}
+	
+	function handleCancel() {
+		dispatch('cancel');
+	}
+</script>
+
+<!-- Modal Backdrop -->
+<!-- svelte-ignore a11y-click-events-have-key-events -->
+<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+<div 
+	class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" 
+	on:click={handleCancel}
+	on:keydown={(e) => {
+		if (e.key === 'Escape') {
+			handleCancel();
+		}
+	}}
+	tabindex="0"
+	role="dialog"
+	aria-modal="true"
+	aria-labelledby="modal-title"
+>
+	<!-- svelte-ignore a11y-click-events-have-key-events -->
+	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+	<div 
+		class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 xl:w-2/5 shadow-lg rounded-md bg-white" 
+		on:click|stopPropagation
+		role="document"
+	>
+		<!-- Modal Header -->
+		<div class="flex items-center justify-between pb-4 border-b">
+			<h3 id="modal-title" class="text-lg font-medium text-gray-900">{modalTitle}</h3>
+			<button
+				on:click={handleCancel}
+				class="text-gray-400 hover:text-gray-600 transition-colors"
+				aria-label="Fechar modal"
+			>
+				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+		</div>
+		
+		<!-- Modal Body -->
+		<form on:submit|preventDefault={handleSubmit} class="mt-4">
+			<div class="space-y-4">
+				<!-- Name -->
+				<div>
+					<label for="name" class="form-label">Nome *</label>
+					<input
+						id="name"
+						type="text"
+						bind:value={formData.name}
+						class="form-input {errors.name ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+						placeholder="Ex: Dinheiro, PIX, Cartão de Crédito"
+						required
+					/>
+					{#if errors.name}
+						<p class="mt-1 text-sm text-red-600">{errors.name}</p>
+					{/if}
+				</div>
+				
+				<!-- Description -->
+				<div>
+					<label for="description" class="form-label">Descrição</label>
+					<textarea
+						id="description"
+						bind:value={formData.description}
+						rows="3"
+						class="form-input"
+						placeholder="Descrição opcional do meio de pagamento"
+					></textarea>
+				</div>
+				
+				{#if isEdit}
+					<!-- Active Status -->
+					<div>
+						<!-- svelte-ignore a11y_label_has_associated_control -->						
+						<label class="form-label">Status</label>
+						<div class="flex items-center space-x-4 mt-2">
+							<label class="flex items-center">
+								<input
+									type="radio"
+									bind:group={formData.active}
+									value={true}
+									class="form-radio text-indigo-600"
+								/>
+								<span class="ml-2 text-sm text-gray-700">Ativo</span>
+							</label>
+							<label class="flex items-center">
+								<input
+									type="radio"
+									bind:group={formData.active}
+									value={false}
+									class="form-radio text-indigo-600"
+								/>
+								<span class="ml-2 text-sm text-gray-700">Inativo</span>
+							</label>
+						</div>
+					</div>
+				{/if}
+			</div>
+			
+			<!-- Modal Footer -->
+			<div class="flex items-center justify-end space-x-3 pt-6 border-t mt-6">
+				<button
+					type="button"
+					on:click={handleCancel}
+					class="btn btn-secondary"
+					disabled={loading}
+				>
+					Cancelar
+				</button>
+				<button
+					type="submit"
+					class="btn btn-primary"
+					disabled={loading}
+				>
+					{#if loading}
+						<svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						Salvando...
+					{:else}
+						{isEdit ? 'Atualizar' : 'Criar'} Meio de Pagamento
+					{/if}
+				</button>
+			</div>
+		</form>
+	</div>
+</div>

@@ -103,9 +103,10 @@ model Order {
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  customer   Customer    @relation(fields: [customerId], references: [id])
-  user       User        @relation(fields: [userId], references: [id])
-  orderItems OrderItem[]
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
+  orderItems    OrderItem[]
+  orderPayments OrderPayment[]
 
   @@map("orders")
 }
@@ -141,6 +142,35 @@ model InventoryLog {
   user    User    @relation(fields: [userId], references: [id])
 
   @@map("inventory_logs")
+}
+
+model PaymentMethod {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?  @db.Text
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  orderPayments OrderPayment[]
+
+  @@map("payment_methods")
+}
+
+model OrderPayment {
+  id              Int           @id @default(autoincrement())
+  orderId         Int           @map("order_id")
+  paymentMethodId Int           @map("payment_method_id")
+  amount          Decimal       @db.Decimal(10, 2)
+  notes           String?       @db.Text
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+
+  @@map("order_payments")
 }
 
 // Enums
