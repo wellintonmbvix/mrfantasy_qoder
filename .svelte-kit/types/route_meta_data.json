@@ -1,0 +1,71 @@
+{
+	"/": [
+		"src/routes/+page.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/api/auth/login": [
+		"src/routes/api/auth/login/+server.ts"
+	],
+	"/api/auth/logout": [
+		"src/routes/api/auth/logout/+server.ts"
+	],
+	"/api/auth/me": [
+		"src/routes/api/auth/me/+server.ts"
+	],
+	"/api/customers": [
+		"src/routes/api/customers/+server.ts"
+	],
+	"/api/customers/[id]": [
+		"src/routes/api/customers/[id]/+server.ts"
+	],
+	"/api/groups": [
+		"src/routes/api/groups/+server.ts"
+	],
+	"/api/groups/[id]": [
+		"src/routes/api/groups/[id]/+server.ts"
+	],
+	"/api/orders": [
+		"src/routes/api/orders/+server.ts"
+	],
+	"/api/orders/[id]": [
+		"src/routes/api/orders/[id]/+server.ts"
+	],
+	"/api/products": [
+		"src/routes/api/products/+server.ts"
+	],
+	"/api/products/[id]": [
+		"src/routes/api/products/[id]/+server.ts"
+	],
+	"/api/test": [
+		"src/routes/api/test/+server.ts"
+	],
+	"/api/users": [
+		"src/routes/api/users/+server.ts"
+	],
+	"/api/users/[id]": [
+		"src/routes/api/users/[id]/+server.ts"
+	],
+	"/auth/login": [
+		"src/routes/auth/login/+page.ts",
+		"src/routes/auth/login/+page.server.ts",
+		"src/routes/+layout.ts"
+	],
+	"/customers": [
+		"src/routes/+layout.ts"
+	],
+	"/dashboard": [
+		"src/routes/dashboard/+page.server.ts",
+		"src/routes/+layout.ts"
+	],
+	"/orders": [
+		"src/routes/+layout.ts"
+	],
+	"/products": [
+		"src/routes/+layout.ts"
+	],
+	"/users": [
+		"src/routes/users/+page.server.ts",
+		"src/routes/+layout.ts"
+	]
+}

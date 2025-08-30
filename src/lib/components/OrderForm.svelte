@@ -1,0 +1,478 @@
+<script lang="ts">
+	import { createEventDispatcher, onMount } from 'svelte';
+	import { customers } from '$lib/stores/customers.js';
+	import { products } from '$lib/stores/products.js';
+	
+	const dispatch = createEventDispatcher();
+	
+	let selectedCustomerId = '';
+	let orderType: 'RENTAL' | 'SALE' = 'RENTAL';
+	let orderDate = new Date().toISOString().split('T')[0];
+	let rentalStartDate = '';
+	let rentalEndDate = '';
+	let notes = '';
+	let orderItems: Array<{
+		productId: number;
+		product?: any;
+		quantity: number;
+		unitPrice: number;
+		itemType: 'RENTAL' | 'SALE';
+	}> = [];
+	
+	let errors: Record<string, string> = {};
+	let loading = false;
+	let searchingCustomers = false;
+	let searchingProducts = false;
+	let customerSearch = '';
+	let productSearch = '';
+	let customersList: any[] = [];
+	let productsList: any[] = [];
+	let showCustomerDropdown = false;
+	let showProductDropdown = false;
+	
+	$: customersData = $customers;
+	$: productsData = $products;
+	$: totalAmount = orderItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+	$: isRental = orderType === 'RENTAL';
+	
+	onMount(() => {
+		loadInitialData();
+	});
+	
+	async function loadInitialData() {
+		await Promise.all([
+			customers.fetch({ limit: 50 }),
+			products.fetchProducts({ limit: 50 }),
+			products.fetchGroups()
+		]);
+		customersList = customersData.customers;
+		productsList = productsData.products;
+	}
+	
+	async function searchCustomers() {
+		if (customerSearch.length < 2) return;
+		
+		searchingCustomers = true;
+		await customers.fetch({ search: customerSearch, limit: 20 });
+		customersList = customersData.customers;
+		searchingCustomers = false;
+		showCustomerDropdown = true;
+	}
+	
+	async function searchProducts() {
+		if (productSearch.length < 2) return;
+		
+		searchingProducts = true;
+		await products.fetchProducts({ search: productSearch, limit: 20 });
+		productsList = productsData.products;
+		searchingProducts = false;
+		showProductDropdown = true;
+	}
+	
+	function selectCustomer(customer: any) {
+		selectedCustomerId = customer.id.toString();
+		customerSearch = customer.name;
+		showCustomerDropdown = false;
+	}
+	
+	function addProduct(product: any) {
+		const existingIndex = orderItems.findIndex(item => item.productId === product.id);
+		
+		if (existingIndex >= 0) {
+			orderItems[existingIndex].quantity += 1;
+		} else {
+			const defaultPrice = isRental ? product.rentalPrice : product.salePrice;
+			orderItems = [...orderItems, {
+				productId: product.id,
+				product: product,
+				quantity: 1,
+				unitPrice: defaultPrice,
+				itemType: orderType
+			}];
+		}
+		
+		productSearch = '';
+		showProductDropdown = false;
+	}
+	
+	function removeItem(index: number) {
+		orderItems = orderItems.filter((_, i) => i !== index);
+	}
+	
+	function updateItemQuantity(index: number, quantity: number) {
+		if (quantity <= 0) {
+			removeItem(index);
+		} else {
+			orderItems[index].quantity = quantity;
+		}
+	}
+	
+	function updateItemPrice(index: number, price: number) {
+		orderItems[index].unitPrice = price;
+	}
+	
+	function validateForm() {
+		errors = {};
+		
+		if (!selectedCustomerId) {
+			errors.customer = 'Cliente é obrigatório';
+		}
+		
+		if (!orderDate) {
+			errors.orderDate = 'Data do pedido é obrigatória';
+		}
+		
+		if (isRental) {
+			if (!rentalStartDate) {
+				errors.rentalStartDate = 'Data de início é obrigatória para aluguéis';
+			}
+			if (!rentalEndDate) {
+				errors.rentalEndDate = 'Data de fim é obrigatória para aluguéis';
+			}
+			if (rentalStartDate && rentalEndDate && new Date(rentalStartDate) >= new Date(rentalEndDate)) {
+				errors.rentalEndDate = 'Data de fim deve ser posterior à data de início';
+			}
+		}
+		
+		if (orderItems.length === 0) {
+			errors.items = 'Pelo menos um produto é obrigatório';
+		}
+		
+		// Validate stock availability
+		for (const item of orderItems) {
+			if (item.product && item.quantity > item.product.stockQuantity) {
+				errors.items = `Estoque insuficiente para ${item.product.name}`;
+				break;
+			}
+		}
+		
+		return Object.keys(errors).length === 0;
+	}
+	
+	function handleSubmit() {
+		if (!validateForm()) return;
+		
+		loading = true;
+		
+		const orderData = {
+			customerId: parseInt(selectedCustomerId),
+			orderType,
+			orderDate: new Date(orderDate),
+			rentalStartDate: rentalStartDate ? new Date(rentalStartDate) : undefined,
+			rentalEndDate: rentalEndDate ? new Date(rentalEndDate) : undefined,
+			notes,
+			items: orderItems.map(item => ({
+				productId: item.productId,
+				quantity: item.quantity,
+				unitPrice: item.unitPrice,
+				itemType: item.itemType
+			}))
+		};
+		
+		dispatch('submit', { order: orderData });
+		loading = false;
+	}
+	
+	function handleCancel() {
+		dispatch('cancel');
+	}
+	
+	// Calculate rental duration in days
+	$: rentalDays = rentalStartDate && rentalEndDate 
+		? Math.ceil((new Date(rentalEndDate).getTime() - new Date(rentalStartDate).getTime()) / (1000 * 60 * 60 * 24))
+		: 0;
+</script>
+
+<!-- Modal Backdrop -->
+<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" on:click={handleCancel}>
+	<div class="relative top-4 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-lg rounded-md bg-white max-h-screen overflow-y-auto" on:click|stopPropagation>
+		<!-- Modal Header -->
+		<div class="flex items-center justify-between pb-4 border-b">
+			<h3 class="text-lg font-medium text-gray-900">Novo Pedido</h3>
+			<button
+				on:click={handleCancel}
+				class="text-gray-400 hover:text-gray-600 transition-colors"
+			>
+				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+		</div>
+		
+		<!-- Modal Body -->
+		<form on:submit|preventDefault={handleSubmit} class="mt-4">
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				<!-- Left Column - Order Info -->
+				<div class="space-y-4">
+					<h4 class="text-md font-medium text-gray-900">Informações do Pedido</h4>
+					
+					<!-- Order Type -->
+					<div>
+						<label class="form-label">Tipo de pedido *</label>
+						<div class="flex space-x-4">
+							<label class="flex items-center">
+								<input
+									type="radio"
+									bind:group={orderType}
+									value="RENTAL"
+									class="mr-2 text-primary-600 focus:ring-primary-500"
+								/>
+								Aluguel
+							</label>
+							<label class="flex items-center">
+								<input
+									type="radio"
+									bind:group={orderType}
+									value="SALE"
+									class="mr-2 text-primary-600 focus:ring-primary-500"
+								/>
+								Venda
+							</label>
+						</div>
+					</div>
+					
+					<!-- Customer Search -->
+					<div class="relative">
+						<label for="customer" class="form-label">Cliente *</label>
+						<input
+							type="text"
+							bind:value={customerSearch}
+							on:input={searchCustomers}
+							on:focus={() => showCustomerDropdown = true}
+							class="form-input {errors.customer ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+							placeholder="Buscar cliente por nome ou email..."
+							required
+						/>
+						{#if showCustomerDropdown && customersList.length > 0}
+							<div class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+								{#each customersList as customer}
+									<button
+										type="button"
+										on:click={() => selectCustomer(customer)}
+										class="w-full text-left px-3 py-2 hover:bg-gray-100 focus:bg-gray-100"
+									>
+										<div class="font-medium">{customer.name}</div>
+										<div class="text-sm text-gray-500">{customer.email}</div>
+									</button>
+								{/each}
+							</div>
+						{/if}
+						{#if errors.customer}
+							<p class="mt-1 text-sm text-red-600">{errors.customer}</p>
+						{/if}
+					</div>
+					
+					<!-- Order Date -->
+					<div>
+						<label for="orderDate" class="form-label">Data do pedido *</label>
+						<input
+							id="orderDate"
+							type="date"
+							bind:value={orderDate}
+							class="form-input {errors.orderDate ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+							required
+						/>
+						{#if errors.orderDate}
+							<p class="mt-1 text-sm text-red-600">{errors.orderDate}</p>
+						{/if}
+					</div>
+					
+					{#if isRental}
+						<!-- Rental Dates -->
+						<div class="grid grid-cols-2 gap-4">
+							<div>
+								<label for="rentalStartDate" class="form-label">Data de início *</label>
+								<input
+									id="rentalStartDate"
+									type="date"
+									bind:value={rentalStartDate}
+									class="form-input {errors.rentalStartDate ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+									required
+								/>
+								{#if errors.rentalStartDate}
+									<p class="mt-1 text-sm text-red-600">{errors.rentalStartDate}</p>
+								{/if}
+							</div>
+							<div>
+								<label for="rentalEndDate" class="form-label">Data de fim *</label>
+								<input
+									id="rentalEndDate"
+									type="date"
+									bind:value={rentalEndDate}
+									class="form-input {errors.rentalEndDate ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+									required
+								/>
+								{#if errors.rentalEndDate}
+									<p class="mt-1 text-sm text-red-600">{errors.rentalEndDate}</p>
+								{/if}
+							</div>
+						</div>
+						
+						{#if rentalDays > 0}
+							<div class="text-sm text-gray-600">
+								Duração: {rentalDays} dia(s)
+							</div>
+						{/if}
+					{/if}
+					
+					<!-- Notes -->
+					<div>
+						<label for="notes" class="form-label">Observações</label>
+						<textarea
+							id="notes"
+							bind:value={notes}
+							rows="3"
+							class="form-input"
+							placeholder="Observações sobre o pedido..."
+						></textarea>
+					</div>
+				</div>
+				
+				<!-- Right Column - Products -->
+				<div class="space-y-4">
+					<h4 class="text-md font-medium text-gray-900">Produtos</h4>
+					
+					<!-- Product Search -->
+					<div class="relative">
+						<label class="form-label">Adicionar produto</label>
+						<input
+							type="text"
+							bind:value={productSearch}
+							on:input={searchProducts}
+							on:focus={() => showProductDropdown = true}
+							class="form-input"
+							placeholder="Buscar produto por nome ou SKU..."
+						/>
+						{#if showProductDropdown && productsList.length > 0}
+							<div class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+								{#each productsList as product}
+									<button
+										type="button"
+										on:click={() => addProduct(product)}
+										class="w-full text-left px-3 py-2 hover:bg-gray-100 focus:bg-gray-100"
+										disabled={product.stockQuantity === 0}
+									>
+										<div class="flex justify-between">
+											<div>
+												<div class="font-medium">{product.name}</div>
+												<div class="text-sm text-gray-500">{product.sku} - Estoque: {product.stockQuantity}</div>
+											</div>
+											<div class="text-sm">
+												<div>A: R$ {product.rentalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+												<div>V: R$ {product.salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+											</div>
+										</div>
+									</button>
+								{/each}
+							</div>
+						{/if}
+					</div>
+					
+					<!-- Order Items -->
+					{#if orderItems.length > 0}
+						<div class="space-y-3">
+							<h5 class="text-sm font-medium text-gray-700">Itens do pedido</h5>
+							{#each orderItems as item, index}
+								<div class="border rounded-lg p-3 bg-gray-50">
+									<div class="flex justify-between items-start mb-2">
+										<div class="flex-1">
+											<div class="font-medium text-sm">{item.product?.name}</div>
+											<div class="text-xs text-gray-500">{item.product?.sku}</div>
+										</div>
+										<button
+											type="button"
+											on:click={() => removeItem(index)}
+											class="text-red-600 hover:text-red-800"
+											title="Remover item"
+										>
+											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+									<div class="grid grid-cols-3 gap-2">
+										<div>
+											<label class="text-xs text-gray-600">Qtd</label>
+											<input
+												type="number"
+												min="1"
+												max={item.product?.stockQuantity}
+												value={item.quantity}
+												on:change={(e) => updateItemQuantity(index, parseInt(e.target.value))}
+												class="w-full text-sm border border-gray-300 rounded px-2 py-1"
+											/>
+										</div>
+										<div>
+											<label class="text-xs text-gray-600">Preço unit.</label>
+											<input
+												type="number"
+												min="0"
+												step="0.01"
+												value={item.unitPrice}
+												on:change={(e) => updateItemPrice(index, parseFloat(e.target.value))}
+												class="w-full text-sm border border-gray-300 rounded px-2 py-1"
+											/>
+										</div>
+										<div>
+											<label class="text-xs text-gray-600">Total</label>
+											<div class="text-sm font-medium py-1">
+												R$ {(item.quantity * item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+											</div>
+										</div>
+									</div>
+								</div>
+							{/each}
+							
+							<!-- Total -->
+							<div class="border-t pt-3">
+								<div class="flex justify-between items-center font-semibold">
+									<span>Total do pedido:</span>
+									<span class="text-lg">R$ {totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+								</div>
+							</div>
+						</div>
+					{:else}
+						<div class="text-center py-8 text-gray-500">
+							<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 48 48">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M9 21h6" />
+							</svg>
+							<p class="mt-2">Nenhum produto adicionado</p>
+							<p class="text-sm">Use a busca acima para adicionar produtos</p>
+						</div>
+					{/if}
+					
+					{#if errors.items}
+						<p class="text-sm text-red-600">{errors.items}</p>
+					{/if}
+				</div>
+			</div>
+			
+			<!-- Modal Footer -->
+			<div class="flex items-center justify-end space-x-3 pt-6 border-t mt-6">
+				<button
+					type="button"
+					on:click={handleCancel}
+					class="btn btn-secondary"
+					disabled={loading}
+				>
+					Cancelar
+				</button>
+				<button
+					type="submit"
+					class="btn btn-primary"
+					disabled={loading || orderItems.length === 0}
+				>
+					{#if loading}
+						<svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						Criando...
+					{:else}
+						Criar Pedido
+					{/if}
+				</button>
+			</div>
+		</form>
+	</div>
+</div>
