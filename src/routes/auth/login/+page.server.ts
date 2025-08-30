@@ -8,6 +8,8 @@ const data = await request.formData();
 const email = data.get('email') as string;
 const password = data.get('password') as string;
 
+console.log('Form login attempt for:', email); // Debug log
+
 // Validação de entrada
 if (!email || !password) {
 return fail(400, {
@@ -20,11 +22,10 @@ email
 let authResult;
 try {
 authResult = await AuthService.login({ email, password });
+console.log('Form login successful for:', email); // Debug log
 } catch (error) {
 // Log para debugging em desenvolvimento
-if (process.env.NODE_ENV === 'development') {
-console.error('Login error:', error);
-}
+console.error('Form login error:', error);
 
 return fail(401, {
 error: error instanceof Error ? error.message : 'Erro interno do servidor',
@@ -41,11 +42,15 @@ sameSite: 'lax',
 maxAge: 60 * 60 * 24 // 24 hours
 });
 
+console.log('Form cookie set for user:', email); // Debug log
+
 // Validar e realizar redirecionamento (fora do try-catch)
-const rawRedirectTo = url.searchParams.get('redirectTo') || '/dashboard/';
+const rawRedirectTo = url.searchParams.get('redirectTo') || '/dashboard';
 // Validação de segurança: permitir apenas URLs internas
 const isValidRedirect = rawRedirectTo.startsWith('/') && !rawRedirectTo.startsWith('//');
-const redirectTo = isValidRedirect ? rawRedirectTo : '/dashboard/';
+const redirectTo = isValidRedirect ? rawRedirectTo : '/dashboard';
+
+console.log('Redirecting to:', redirectTo); // Debug log
 
 throw redirect(302, redirectTo);
 }

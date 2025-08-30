@@ -10,9 +10,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		try {
 			const token = jwt.verify(authCookie, JWT_SECRET) as any;
 			event.locals.user = token;
+			console.log('User authenticated:', token.email); // Debug log
 		} catch (err) {
+			console.error('JWT verification failed:', err); // Debug log
 			event.cookies.delete('auth-token', { path: '/' });
 		}
+	} else {
+		console.log('No auth cookie found'); // Debug log
 	}
 
 	// Protect routes that require authentication
@@ -23,6 +27,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.url.pathname.startsWith('/users')) {
 		
 		if (!event.locals.user) {
+			console.log('Protected route accessed without auth, redirecting to login'); // Debug log
 			return new Response('Redirect', {
 				status: 302,
 				headers: { Location: '/auth/login' }

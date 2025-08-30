@@ -10,7 +10,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			return json({ error: 'Email e senha são obrigatórios' }, { status: 400 });
 		}
 
+		console.log('Login attempt for:', email); // Debug log
+
 		const result = await AuthService.login({ email, password });
+
+		console.log('Login successful for:', email); // Debug log
 
 		// Set auth cookie
 		cookies.set('auth-token', result.token, {
@@ -21,11 +25,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			maxAge: 60 * 60 * 24 // 24 hours
 		});
 
+		console.log('Cookie set for user:', email); // Debug log
+
 		return json({
 			success: true,
 			user: result.user
 		});
 	} catch (error) {
+		console.error('Login error:', error); // Debug log
 		return json(
 			{ error: error instanceof Error ? error.message : 'Erro interno do servidor' },
 			{ status: 401 }
