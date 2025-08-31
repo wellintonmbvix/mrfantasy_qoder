@@ -95,7 +95,14 @@ async function main() {
 			name: 'João Silva',
 			email: 'cliente@exemplo.com',
 			phone: '(11) 99999-9999',
-			address: 'Rua das Flores, 123 - São Paulo, SP',
+			phone2: '(11) 88888-8888',
+			address: 'Rua das Flores',
+			number: '123',
+			complement: 'Apto 45',
+			neighborhood: 'Centro',
+			city: 'São Paulo',
+			state: 'SP',
+			zipCode: '01234567',
 			documentNumber: '123.456.789-10'
 		}
 	});

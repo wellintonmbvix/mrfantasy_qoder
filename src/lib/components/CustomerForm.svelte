@@ -9,7 +9,14 @@
 		name: customer?.name || '',
 		email: customer?.email || '',
 		phone: customer?.phone || '',
+		phone2: customer?.phone2 || '',
 		address: customer?.address || '',
+		number: customer?.number || '',
+		complement: customer?.complement || '',
+		neighborhood: customer?.neighborhood || '',
+		city: customer?.city || '',
+		state: customer?.state || '',
+		zipCode: customer?.zipCode || '',
 		documentNumber: customer?.documentNumber || ''
 	};
 	
@@ -44,6 +51,28 @@
 		
 		if (!formData.address.trim()) {
 			errors.address = 'Endereço é obrigatório';
+		}
+		
+		if (!formData.number.trim()) {
+			errors.number = 'Número é obrigatório';
+		}
+		
+		if (!formData.neighborhood.trim()) {
+			errors.neighborhood = 'Bairro é obrigatório';
+		}
+		
+		if (!formData.city.trim()) {
+			errors.city = 'Cidade é obrigatória';
+		}
+		
+		if (!formData.state.trim()) {
+			errors.state = 'Estado é obrigatório';
+		} else if (formData.state.length !== 2) {
+			errors.state = 'Estado deve ter 2 caracteres (UF)';
+		}
+		
+		if (!formData.zipCode.trim()) {
+			errors.zipCode = 'CEP é obrigatório';
 		}
 		
 		if (!formData.documentNumber.trim()) {
@@ -92,14 +121,46 @@
 		return value;
 	}
 	
+	function formatCEP(value: string) {
+		// Remove all non-digits
+		const cleaned = value.replace(/\D/g, '');
+		
+		// Apply CEP mask 99999-999
+		if (cleaned.length <= 8) {
+			return cleaned.replace(/(\d{5})(\d{3})/, '$1-$2');
+		}
+		
+		return value;
+	}
+	
+	function formatState(value: string) {
+		// Convert to uppercase and limit to 2 characters
+		return value.toUpperCase().slice(0, 2);
+	}
+	
 	function handlePhoneInput(event: Event) {
 		const target = event.target as HTMLInputElement;
 		formData.phone = formatPhone(target.value);
 	}
 	
+	function handlePhone2Input(event: Event) {
+		const target = event.target as HTMLInputElement;
+		formData.phone2 = formatPhone(target.value);
+	}
+	
 	function handleDocumentInput(event: Event) {
 		const target = event.target as HTMLInputElement;
 		formData.documentNumber = formatDocument(target.value);
+	}
+	
+	function handleCEPInput(event: Event) {
+		const target = event.target as HTMLInputElement;
+		formData.zipCode = formatCEP(target.value);
+	}
+	
+	function handleStateInput(event: Event) {
+		const target = event.target as HTMLInputElement;
+		formData.state = formatState(target.value);
 	}
 </script>
 
@@ -175,23 +236,6 @@
 					{/if}
 				</div>
 				
-				<!-- Phone -->
-				<div>
-					<label for="phone" class="form-label">Telefone *</label>
-					<input
-						id="phone"
-						type="tel"
-						value={formData.phone}
-						on:input={handlePhoneInput}
-						class="form-input {errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
-						placeholder="(11) 99999-9999"
-						required
-					/>
-					{#if errors.phone}
-						<p class="mt-1 text-sm text-red-600">{errors.phone}</p>
-					{/if}
-				</div>
-				
 				<!-- Document Number -->
 				<div>
 					<label for="documentNumber" class="form-label">CPF *</label>
@@ -209,20 +253,153 @@
 					{/if}
 				</div>
 				
-				<!-- Address -->
-				<div>
-					<label for="address" class="form-label">Endereço completo *</label>
-					<textarea
-						id="address"
-						bind:value={formData.address}
-						rows="3"
-						class="form-input {errors.address ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
-						placeholder="Rua, número, bairro, cidade - UF, CEP"
-						required
-					></textarea>
-					{#if errors.address}
-						<p class="mt-1 text-sm text-red-600">{errors.address}</p>
-					{/if}
+				<!-- Phones -->
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div>
+						<label for="phone" class="form-label">Telefone *</label>
+						<input
+							id="phone"
+							type="tel"
+							value={formData.phone}
+							on:input={handlePhoneInput}
+							class="form-input {errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+							placeholder="(11) 99999-9999"
+							required
+						/>
+						{#if errors.phone}
+							<p class="mt-1 text-sm text-red-600">{errors.phone}</p>
+						{/if}
+					</div>
+					
+					<div>
+						<label for="phone2" class="form-label">Telefone 2</label>
+						<input
+							id="phone2"
+							type="tel"
+							value={formData.phone2}
+							on:input={handlePhone2Input}
+							class="form-input"
+							placeholder="(11) 88888-8888"
+						/>
+					</div>
+				</div>
+				
+				<!-- Address Fields -->
+				<div class="space-y-4">
+					<h4 class="text-md font-medium text-gray-700 border-b pb-2">Endereço</h4>
+					
+					<!-- Street Address -->
+					<div>
+						<label for="address" class="form-label">Logradouro *</label>
+						<input
+							id="address"
+							type="text"
+							bind:value={formData.address}
+							class="form-input {errors.address ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+							placeholder="Rua das Flores"
+							required
+						/>
+						{#if errors.address}
+							<p class="mt-1 text-sm text-red-600">{errors.address}</p>
+						{/if}
+					</div>
+					
+					<!-- Number and Complement -->
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div>
+							<label for="number" class="form-label">Número *</label>
+							<input
+								id="number"
+								type="text"
+								bind:value={formData.number}
+								class="form-input {errors.number ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+								placeholder="123"
+								required
+							/>
+							{#if errors.number}
+								<p class="mt-1 text-sm text-red-600">{errors.number}</p>
+							{/if}
+						</div>
+						
+						<div>
+							<label for="complement" class="form-label">Complemento</label>
+							<input
+								id="complement"
+								type="text"
+								bind:value={formData.complement}
+								class="form-input"
+								placeholder="Apto 45"
+							/>
+						</div>
+					</div>
+					
+					<!-- Neighborhood -->
+					<div>
+						<label for="neighborhood" class="form-label">Bairro *</label>
+						<input
+							id="neighborhood"
+							type="text"
+							bind:value={formData.neighborhood}
+							class="form-input {errors.neighborhood ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+							placeholder="Centro"
+							required
+						/>
+						{#if errors.neighborhood}
+							<p class="mt-1 text-sm text-red-600">{errors.neighborhood}</p>
+						{/if}
+					</div>
+					
+					<!-- City, State and ZIP -->
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div class="md:col-span-2">
+							<label for="city" class="form-label">Cidade *</label>
+							<input
+								id="city"
+								type="text"
+								bind:value={formData.city}
+								class="form-input {errors.city ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+								placeholder="São Paulo"
+								required
+							/>
+							{#if errors.city}
+								<p class="mt-1 text-sm text-red-600">{errors.city}</p>
+							{/if}
+						</div>
+						
+						<div>
+							<label for="state" class="form-label">UF *</label>
+							<input
+								id="state"
+								type="text"
+								value={formData.state}
+								on:input={handleStateInput}
+								class="form-input {errors.state ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+								placeholder="SP"
+								maxlength="2"
+								required
+							/>
+							{#if errors.state}
+								<p class="mt-1 text-sm text-red-600">{errors.state}</p>
+							{/if}
+						</div>
+					</div>
+					
+					<!-- ZIP Code -->
+					<div>
+						<label for="zipCode" class="form-label">CEP *</label>
+						<input
+							id="zipCode"
+							type="text"
+							value={formData.zipCode}
+							on:input={handleCEPInput}
+							class="form-input {errors.zipCode ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+							placeholder="01234-567"
+							required
+						/>
+						{#if errors.zipCode}
+							<p class="mt-1 text-sm text-red-600">{errors.zipCode}</p>
+						{/if}
+					</div>
 				</div>
 			</div>
 			

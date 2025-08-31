@@ -5,7 +5,14 @@ interface Customer {
 	name: string;
 	email: string;
 	phone: string;
+	phone2?: string;
 	address: string;
+	number: string;
+	complement?: string;
+	neighborhood: string;
+	city: string;
+	state: string;
+	zipCode: string;
 	documentNumber: string;
 	createdAt: string;
 	updatedAt: string;

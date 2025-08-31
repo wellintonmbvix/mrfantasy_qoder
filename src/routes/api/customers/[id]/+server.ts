@@ -7,7 +7,14 @@ const CustomerUpdateSchema = z.object({
 	name: z.string().min(1, 'Nome é obrigatório').optional(),
 	email: z.string().email('Email inválido').optional(),
 	phone: z.string().min(1, 'Telefone é obrigatório').optional(),
+	phone2: z.string().optional(),
 	address: z.string().min(1, 'Endereço é obrigatório').optional(),
+	number: z.string().min(1, 'Número é obrigatório').optional(),
+	complement: z.string().optional(),
+	neighborhood: z.string().min(1, 'Bairro é obrigatório').optional(),
+	city: z.string().min(1, 'Cidade é obrigatória').optional(),
+	state: z.string().min(1, 'Estado é obrigatório').optional(),
+	zipCode: z.string().min(1, 'CEP é obrigatório').optional(),
 	documentNumber: z.string().min(1, 'Documento é obrigatório').optional()
 });
 

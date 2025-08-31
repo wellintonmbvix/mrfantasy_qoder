@@ -222,7 +222,23 @@
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<div class="text-sm text-gray-900">{customer.phone}</div>
-									<div class="text-sm text-gray-500 truncate max-w-xs">{customer.address}</div>
+									{#if customer.phone2}
+										<div class="text-sm text-gray-500">{customer.phone2}</div>
+									{/if}
+								</td>
+								<td class="px-6 py-4">
+									<div class="text-sm text-gray-900">
+										{customer.address}, {customer.number}
+										{#if customer.complement}
+											- {customer.complement}
+										{/if}
+									</div>
+									<div class="text-sm text-gray-500">
+										{customer.neighborhood}, {customer.city} - {customer.state}
+									</div>
+									<div class="text-sm text-gray-500">
+										CEP: {customer.zipCode}
+									</div>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 									{customer.documentNumber}

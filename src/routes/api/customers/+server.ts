@@ -7,7 +7,14 @@ const CustomerSchema = z.object({
 	name: z.string().min(1, 'Nome é obrigatório'),
 	email: z.string().email('Email inválido'),
 	phone: z.string().min(1, 'Telefone é obrigatório'),
+	phone2: z.string().optional(),
 	address: z.string().min(1, 'Endereço é obrigatório'),
+	number: z.string().min(1, 'Número é obrigatório'),
+	complement: z.string().optional(),
+	neighborhood: z.string().min(1, 'Bairro é obrigatório'),
+	city: z.string().min(1, 'Cidade é obrigatória'),
+	state: z.string().min(1, 'Estado é obrigatório'),
+	zipCode: z.string().min(1, 'CEP é obrigatório'),
 	documentNumber: z.string().min(1, 'Documento é obrigatório')
 });
 
@@ -24,7 +31,10 @@ export const GET: RequestHandler = async ({ url }) => {
 						{ name: { contains: search } },
 						{ email: { contains: search } },
 						{ phone: { contains: search } },
-						{ documentNumber: { contains: search } }
+						{ phone2: { contains: search } },
+						{ documentNumber: { contains: search } },
+						{ city: { contains: search } },
+						{ neighborhood: { contains: search } }
 					],
 					active: true
 			  }

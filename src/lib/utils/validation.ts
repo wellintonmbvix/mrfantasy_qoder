@@ -12,10 +12,38 @@ export const customerSchema = z.object({
 	phone: z.string()
 		.min(10, 'Telefone deve ter pelo menos 10 dígitos')
 		.regex(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, 'Formato de telefone inválido'),
+	phone2: z.string()
+		.regex(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, 'Formato de telefone inválido')
+		.optional()
+		.or(z.literal('')),
 	address: z.string()
 		.min(10, 'Endereço deve ter pelo menos 10 caracteres')
 		.max(500, 'Endereço deve ter no máximo 500 caracteres')
 		.trim(),
+	number: z.string()
+		.min(1, 'Número é obrigatório')
+		.max(20, 'Número deve ter no máximo 20 caracteres')
+		.trim(),
+	complement: z.string()
+		.max(100, 'Complemento deve ter no máximo 100 caracteres')
+		.trim()
+		.optional()
+		.or(z.literal('')),
+	neighborhood: z.string()
+		.min(2, 'Bairro deve ter pelo menos 2 caracteres')
+		.max(100, 'Bairro deve ter no máximo 100 caracteres')
+		.trim(),
+	city: z.string()
+		.min(2, 'Cidade deve ter pelo menos 2 caracteres')
+		.max(100, 'Cidade deve ter no máximo 100 caracteres')
+		.trim(),
+	state: z.string()
+		.length(2, 'Estado deve ter 2 caracteres (UF)')
+		.regex(/^[A-Z]{2}$/, 'Estado deve estar em formato UF (ex: SP)')
+		.trim(),
+	zipCode: z.string()
+		.regex(/^\d{5}-?\d{3}$/, 'CEP inválido (formato: 00000-000)')
+		.transform(val => val.replace('-', '')),
 	documentNumber: z.string()
 		.regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, 'CPF inválido')
 });
