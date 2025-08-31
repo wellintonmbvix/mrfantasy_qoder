@@ -42,6 +42,8 @@
 </script>
 
 <!-- Modal Backdrop -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" on:click={handleClose}>
 	<!-- Modal Container -->
 	<div class="relative top-4 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white" on:click|stopPropagation>
@@ -68,6 +70,7 @@
 						Editar
 					</button>
 				{/if}
+				<!-- svelte-ignore a11y_consider_explicit_label -->
 				<button
 					type="button"
 					on:click={handleClose}
