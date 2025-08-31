@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 const OrderUpdateSchema = z.object({
 	status: z.enum(['PENDING', 'CONFIRMED', 'DELIVERED', 'RETURNED', 'CANCELLED']).optional(),
+	attendantId: z.number().int().positive('ID do atendente deve ser positivo').optional(),
 	rentalStartDate: z.string().transform((str) => new Date(str)).optional(),
 	rentalEndDate: z.string().transform((str) => new Date(str)).optional(),
 	returnDate: z.string().transform((str) => new Date(str)).optional(),
@@ -22,6 +23,13 @@ export const GET: RequestHandler = async ({ params }) => {
 						id: true,
 						username: true,
 						email: true
+					}
+				},
+				attendant: {
+					select: {
+						id: true,
+						name: true,
+						abbreviation: true
 					}
 				},
 				orderItems: {
@@ -145,6 +153,13 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 					select: {
 						id: true,
 						username: true
+					}
+				},
+				attendant: {
+					select: {
+						id: true,
+						name: true,
+						abbreviation: true
 					}
 				},
 				orderItems: {

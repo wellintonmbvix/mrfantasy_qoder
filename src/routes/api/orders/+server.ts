@@ -18,7 +18,8 @@ const OrderPaymentSchema = z.object({
 });
 
 const OrderSchema = z.object({
-	customerId: z.number().int().positive('ID do cliente deve ser positivo'),
+	customerId: z.number().int().positive('ID do cliente deve ser positivo').optional(),
+	attendantId: z.number().int().positive('ID do atendente deve ser positivo'),
 	orderType: z.enum(['RENTAL', 'SALE']),
 	orderDate: z.string().transform((str) => new Date(str)),
 	rentalStartDate: z.string().transform((str) => new Date(str)).optional(),
@@ -26,6 +27,12 @@ const OrderSchema = z.object({
 	notes: z.string().optional(),
 	items: z.array(OrderItemSchema).min(1, 'Pelo menos um item é obrigatório'),
 	payments: z.array(OrderPaymentSchema).min(1, 'Pelo menos um meio de pagamento é obrigatório')
+}).refine((data) => {
+	// Cliente é obrigatório apenas para aluguéis
+	return data.orderType !== 'RENTAL' || data.customerId !== undefined;
+}, {
+	message: 'Cliente é obrigatório para pedidos de aluguel',
+	path: ['customerId']
 });
 
 export const GET: RequestHandler = async ({ url, locals }) => {
@@ -65,6 +72,13 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 						select: {
 							id: true,
 							username: true
+						}
+					},
+					attendant: {
+						select: {
+							id: true,
+							name: true,
+							abbreviation: true
 						}
 					},
 					orderItems: {
@@ -223,8 +237,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			// Create the order
 			const newOrder = await tx.order.create({
 				data: {
-					customerId: validatedData.customerId,
+					customerId: validatedData.customerId || null,
 					userId: locals.user!.id,
+					attendantId: validatedData.attendantId,
 					orderNumber,
 					orderType: validatedData.orderType,
 					totalAmount,
@@ -295,6 +310,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					select: {
 						id: true,
 						username: true
+					}
+				},
+				attendant: {
+					select: {
+						id: true,
+						name: true,
+						abbreviation: true
 					}
 				},
 				orderItems: {

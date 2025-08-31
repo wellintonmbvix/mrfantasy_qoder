@@ -96,8 +96,9 @@ model Product {
 
 model Order {
   id              Int         @id @default(autoincrement())
-  customerId      Int         @map("customer_id")
+  customerId      Int?        @map("customer_id")
   userId          Int         @map("user_id")
+  attendantId     Int?        @map("attendant_id")
   orderNumber     String      @unique @map("order_number")
   orderType       OrderType   @map("order_type")
   totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
@@ -111,8 +112,9 @@ model Order {
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  customer      Customer       @relation(fields: [customerId], references: [id])
+  customer      Customer?      @relation(fields: [customerId], references: [id])
   user          User           @relation(fields: [userId], references: [id])
+  attendant     Employee?      @relation(fields: [attendantId], references: [id])
   orderItems    OrderItem[]
   orderPayments OrderPayment[]
 
@@ -202,6 +204,9 @@ model Employee {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   active         Boolean  @default(true)
+
+  // Relations
+  orders Order[]
 
   @@map("employees")
 }

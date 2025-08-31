@@ -16,8 +16,9 @@ interface OrderItem {
 
 interface Order {
 	id: number;
-	customerId: number;
+	customerId?: number;
 	userId: number;
+	attendantId?: number;
 	orderNumber: string;
 	orderType: 'RENTAL' | 'SALE';
 	totalAmount: number;
@@ -38,6 +39,11 @@ interface Order {
 	user?: {
 		id: number;
 		username: string;
+	};
+	attendant?: {
+		id: number;
+		name: string;
+		abbreviation: string;
 	};
 	orderItems: OrderItem[];
 }
@@ -107,7 +113,8 @@ function createOrdersStore() {
 			}
 		},
 		createOrder: async (orderData: {
-			customerId: number;
+			customerId?: number;
+			attendantId: number;
 			orderType: 'RENTAL' | 'SALE';
 			orderDate: Date;
 			rentalStartDate?: Date;
@@ -118,6 +125,11 @@ function createOrdersStore() {
 				quantity: number;
 				unitPrice: number;
 				itemType: 'RENTAL' | 'SALE';
+			}>;
+			payments: Array<{
+				paymentMethodId: number;
+				amount: number;
+				notes?: string;
 			}>;
 		}) => {
 			try {
@@ -149,6 +161,7 @@ function createOrdersStore() {
 		},
 		updateOrder: async (id: number, orderData: {
 			status?: 'PENDING' | 'CONFIRMED' | 'DELIVERED' | 'RETURNED' | 'CANCELLED';
+			attendantId?: number;
 			rentalStartDate?: Date;
 			rentalEndDate?: Date;
 			returnDate?: Date;

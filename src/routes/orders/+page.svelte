@@ -258,6 +258,9 @@
 								Cliente
 							</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+								Atendente
+							</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
 								Tipo
 							</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -287,10 +290,24 @@
 									{/if}
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
-									<div>
-										<div class="text-sm font-medium text-gray-900">{order.customer?.name}</div>
-										<div class="text-sm text-gray-500">{order.customer?.email}</div>
-									</div>
+									{#if order.customer}
+										<div>
+											<div class="text-sm font-medium text-gray-900">{order.customer.name}</div>
+											<div class="text-sm text-gray-500">{order.customer.email}</div>
+										</div>
+									{:else}
+										<span class="text-sm text-gray-400">Sem cliente</span>
+									{/if}
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									{#if order.attendant}
+										<div>
+											<div class="text-sm font-medium text-gray-900">{order.attendant.name}</div>
+											<div class="text-sm text-gray-500">{order.attendant.abbreviation}</div>
+										</div>
+									{:else}
+										<span class="text-sm text-gray-400">Não definido</span>
+									{/if}
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {order.orderType === 'RENTAL' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">

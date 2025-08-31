@@ -2,10 +2,12 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { customers } from '$lib/stores/customers.js';
 	import { products } from '$lib/stores/products.js';
+	import { employees } from '$lib/stores/employees.js';
 	
 	const dispatch = createEventDispatcher();
 	
 	let selectedCustomerId = '';
+	let selectedAttendantId = '';
 	let orderType: 'RENTAL' | 'SALE' = 'RENTAL';
 	let orderDate = new Date().toISOString().split('T')[0];
 	let rentalStartDate = '';
@@ -37,12 +39,14 @@
 	let customerSearch = '';
 	let productSearch = '';
 	let customersList: any[] = [];
+	let employeesList: any[] = [];
 	let productsList: any[] = [];
 	let showCustomerDropdown = false;
 	let showProductDropdown = false;
 	
 	// Reactive declarations
 	let customersData: any;
+	let employeesData: any;
 	let productsData: any;
 	let totalAmount: number;
 	let totalPayments: number;
@@ -52,6 +56,7 @@
 	
 	$: {
 		customersData = $customers;
+		employeesData = $employees;
 		productsData = $products;
 		totalAmount = orderItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
 		totalPayments = orderPayments.reduce((sum, payment) => sum + payment.amount, 0);
@@ -69,11 +74,13 @@
 	async function loadInitialData() {
 		await Promise.all([
 			customers.fetch({ limit: 50 }),
+			employees.fetch({ limit: 50 }),
 			products.fetchProducts({ limit: 50 }),
 			products.fetchGroups(),
 			loadPaymentMethods()
 		]);
 		customersList = customersData.customers;
+		employeesList = employeesData.employees || [];
 		productsList = productsData.products;
 	}
 	
@@ -195,8 +202,14 @@
 	function validateForm() {
 		errors = {};
 		
-		if (!selectedCustomerId) {
-			errors.customer = 'Cliente é obrigatório';
+		// Atendente é sempre obrigatório
+		if (!selectedAttendantId) {
+			errors.attendant = 'Atendente é obrigatório';
+		}
+		
+		// Cliente é obrigatório apenas para aluguéis
+		if (isRental && !selectedCustomerId) {
+			errors.customer = 'Cliente é obrigatório para aluguéis';
 		}
 		
 		if (!orderDate) {
@@ -255,7 +268,8 @@
 		loading = true;
 		
 		const orderData = {
-			customerId: parseInt(selectedCustomerId),
+			...(selectedCustomerId && { customerId: parseInt(selectedCustomerId) }),
+			attendantId: parseInt(selectedAttendantId),
 			orderType,
 			orderDate: new Date(orderDate),
 			rentalStartDate: rentalStartDate ? new Date(rentalStartDate) : undefined,
@@ -355,7 +369,7 @@
 					
 					<!-- Customer Search -->
 					<div class="relative">
-						<label for="customer" class="form-label">Cliente *</label>
+						<label for="customer" class="form-label">Cliente {isRental ? '*' : ''}</label>
 						<input
 							type="text"
 							bind:value={customerSearch}
@@ -363,7 +377,7 @@
 							on:focus={() => showCustomerDropdown = true}
 							class="form-input {errors.customer ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
 							placeholder="Buscar cliente por nome ou email..."
-							required
+							required={isRental}
 						/>
 						{#if showCustomerDropdown && customersList.length > 0}
 							<div class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
@@ -381,6 +395,27 @@
 						{/if}
 						{#if errors.customer}
 							<p class="mt-1 text-sm text-red-600">{errors.customer}</p>
+						{/if}
+					</div>
+									
+					<!-- Attendant Selection -->
+					<div>
+						<label for="attendant" class="form-label">Atendente *</label>
+						<select
+							id="attendant"
+							bind:value={selectedAttendantId}
+							class="form-input {errors.attendant ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+							required
+						>
+							<option value="">Selecione um atendente</option>
+							{#each employeesList as employee}
+								{#if employee.active}
+									<option value={employee.id}>{employee.name} ({employee.abbreviation})</option>
+								{/if}
+							{/each}
+						</select>
+						{#if errors.attendant}
+							<p class="mt-1 text-sm text-red-600">{errors.attendant}</p>
 						{/if}
 					</div>
 					
