@@ -181,6 +181,31 @@ model OrderPayment {
   @@map("order_payments")
 }
 
+model Employee {
+  id             Int      @id @default(autoincrement())
+  name           String
+  abbreviation   String   @map("abbreviation")
+  email          String   @unique
+  phone          String
+  phone2         String?  @map("phone_2")
+  address        String   @db.Text
+  number         String
+  complement     String?
+  neighborhood   String
+  city           String
+  state          String
+  zipCode        String   @map("zip_code")
+  documentNumber String   @map("document_number")
+  position       String   @map("position")
+  hireDate       DateTime @map("hire_date")
+  dismissalDate  DateTime? @map("dismissal_date")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  active         Boolean  @default(true)
+
+  @@map("employees")
+}
+
 model Company {
   id                Int      @id @default(autoincrement())
   razaoSocial       String   @map("razao_social")

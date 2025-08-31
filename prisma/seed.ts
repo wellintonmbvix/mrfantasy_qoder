@@ -128,6 +128,71 @@ async function main() {
 
 	console.log('✅ Default payment methods created');
 
+	// Create sample employees
+	const sampleEmployees = [
+		{
+			name: 'Maria Santos',
+			abbreviation: 'MS',
+			email: 'maria.santos@mrfantasy.com',
+			phone: '(11) 98765-4321',
+			phone2: '(11) 87654-3210',
+			address: 'Av. Principal',
+			number: '456',
+			complement: 'Sala 10',
+			neighborhood: 'Centro',
+			city: 'São Paulo',
+			state: 'SP',
+			zipCode: '01234567',
+			documentNumber: '987.654.321-00',
+			position: 'Gerente',
+			hireDate: new Date('2023-01-15'),
+			dismissalDate: null
+		},
+		{
+			name: 'Pedro Oliveira',
+			abbreviation: 'PO',
+			email: 'pedro.oliveira@mrfantasy.com',
+			phone: '(11) 99888-7766',
+			address: 'Rua Secundária',
+			number: '789',
+			neighborhood: 'Vila Nova',
+			city: 'São Paulo',
+			state: 'SP',
+			zipCode: '04567890',
+			documentNumber: '456.789.123-00',
+			position: 'Vendedor',
+			hireDate: new Date('2023-03-10'),
+			dismissalDate: null
+		},
+		{
+			name: 'Ana Costa',
+			abbreviation: 'AC',
+			email: 'ana.costa@mrfantasy.com',
+			phone: '(11) 91234-5678',
+			address: 'Rua das Palmeiras',
+			number: '321',
+			complement: 'Casa A',
+			neighborhood: 'Jardim América',
+			city: 'São Paulo',
+			state: 'SP',
+			zipCode: '05678901',
+			documentNumber: '789.123.456-00',
+			position: 'Assistente',
+			hireDate: new Date('2023-06-01'),
+			dismissalDate: new Date('2024-01-15') // Ex-funcionária
+		}
+	];
+
+	for (const employee of sampleEmployees) {
+		await prisma.employee.upsert({
+			where: { email: employee.email },
+			update: {},
+			create: employee
+		});
+	}
+
+	console.log('✅ Sample employees created');
+
 	console.log('🎉 Database seeded successfully!');
 	console.log('📧 Admin login: admin@mrfantasy.com');
 	console.log('🔑 Admin password: admin123');
