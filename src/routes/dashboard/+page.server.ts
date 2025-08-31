@@ -54,6 +54,7 @@ export const load: PageServerLoad = async () => {
 
 		const serializedLowStockProducts = lowStockProducts.map(product => ({
 			...product,
+			costPrice: Number(product.costPrice),
 			rentalPrice: Number(product.rentalPrice),
 			salePrice: Number(product.salePrice)
 		}));
