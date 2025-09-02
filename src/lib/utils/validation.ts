@@ -137,9 +137,28 @@ export const orderItemSchema = z.object({
 	unitPrice: z.number()
 		.min(0, 'Preço unitário deve ser positivo')
 		.max(99999.99, 'Preço muito alto'),
+	discountType: z.enum(['PERCENTAGE', 'FIXED'], {
+		errorMap: () => ({ message: 'Tipo de desconto inválido' })
+	}).optional(),
+	discountValue: z.number()
+		.min(0, 'Valor do desconto deve ser positivo')
+		.max(100, 'Desconto percentual não pode ser maior que 100%')
+		.optional(),
 	subtotal: z.number()
 		.min(0, 'Subtotal deve ser positivo')
 		.max(999999.99, 'Subtotal muito alto')
+}).refine((data) => {
+	// Se há desconto, o tipo deve ser especificado
+	return !data.discountValue || data.discountType;
+}, {
+	message: 'Tipo de desconto é obrigatório quando há valor de desconto',
+	path: ['discountType']
+}).refine((data) => {
+	// Se o tipo é percentual, o valor não pode ser maior que 100
+	return data.discountType !== 'PERCENTAGE' || !data.discountValue || data.discountValue <= 100;
+}, {
+	message: 'Desconto percentual não pode ser maior que 100%',
+	path: ['discountValue']
 });
 
 export const orderSchema = z.object({
@@ -155,6 +174,15 @@ export const orderSchema = z.object({
 		.refine(date => !isNaN(Date.parse(date)), 'Data de retorno inválida')
 		.optional()
 		.nullable(),
+	subtotalAmount: z.number()
+		.min(0, 'Subtotal deve ser positivo')
+		.max(999999.99, 'Subtotal muito alto'),
+	discountType: z.enum(['PERCENTAGE', 'FIXED'], {
+		errorMap: () => ({ message: 'Tipo de desconto inválido' })
+	}).optional(),
+	discountValue: z.number()
+		.min(0, 'Valor do desconto deve ser positivo')
+		.optional(),
 	totalAmount: z.number()
 		.min(0, 'Valor total deve ser positivo')
 		.max(999999.99, 'Valor total muito alto'),
@@ -164,6 +192,18 @@ export const orderSchema = z.object({
 	items: z.array(orderItemSchema)
 		.min(1, 'Pedido deve ter pelo menos um item')
 		.max(50, 'Pedido pode ter no máximo 50 itens')
+}).refine((data) => {
+	// Se há desconto no pedido, o tipo deve ser especificado
+	return !data.discountValue || data.discountType;
+}, {
+	message: 'Tipo de desconto é obrigatório quando há valor de desconto',
+	path: ['discountType']
+}).refine((data) => {
+	// Se o tipo é percentual, o valor não pode ser maior que 100
+	return data.discountType !== 'PERCENTAGE' || !data.discountValue || data.discountValue <= 100;
+}, {
+	message: 'Desconto percentual do pedido não pode ser maior que 100%',
+	path: ['discountValue']
 });
 
 // Authentication validation schemas
@@ -384,4 +424,49 @@ export function parseNumber(value: string): number | null {
 	const cleaned = value.replace(/[^\d,.-]/g, '').replace(',', '.');
 	const number = parseFloat(cleaned);
 	return isNaN(number) ? null : number;
+}
+
+// Discount calculation utilities
+export function calculateDiscount(amount: number, discountType: 'PERCENTAGE' | 'FIXED', discountValue: number): number {
+	if (discountType === 'PERCENTAGE') {
+		return (amount * discountValue) / 100;
+	}
+	return Math.min(discountValue, amount); // Fixed discount can't be more than the amount
+}
+
+export function applyDiscount(amount: number, discountType: 'PERCENTAGE' | 'FIXED', discountValue: number): number {
+	const discountAmount = calculateDiscount(amount, discountType, discountValue);
+	return Math.max(0, amount - discountAmount);
+}
+
+// Function to distribute order-level discount across items proportionally
+export function distributeOrderDiscount(
+	items: Array<{ unitPrice: number; quantity: number }>,
+	orderDiscountType: 'PERCENTAGE' | 'FIXED',
+	orderDiscountValue: number
+): Array<{ discountType: 'PERCENTAGE' | 'FIXED'; discountValue: number }> {
+	const totalAmount = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+	
+	if (totalAmount === 0) {
+		return items.map(() => ({ discountType: 'FIXED', discountValue: 0 }));
+	}
+	
+	if (orderDiscountType === 'PERCENTAGE') {
+		// For percentage discounts, apply same percentage to all items
+		return items.map(() => ({ 
+			discountType: 'PERCENTAGE' as const, 
+			discountValue: orderDiscountValue 
+		}));
+	} else {
+		// For fixed discounts, distribute proportionally
+		return items.map((item) => {
+			const itemTotal = item.unitPrice * item.quantity;
+			const proportion = itemTotal / totalAmount;
+			const itemDiscount = orderDiscountValue * proportion;
+			return { 
+				discountType: 'FIXED' as const, 
+				discountValue: itemDiscount 
+			};
+		});
+	}
 }

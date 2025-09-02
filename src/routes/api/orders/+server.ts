@@ -2,13 +2,28 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
 import { z } from 'zod';
+import { calculateDiscount, applyDiscount, distributeOrderDiscount } from '$lib/utils/validation.js';
 
 // Use consistent validation schema
 const OrderItemSchema = z.object({
 	productId: z.number().int().positive('ID do produto deve ser positivo'),
 	quantity: z.number().int().min(1, 'Quantidade deve ser pelo menos 1'),
 	unitPrice: z.number().min(0, 'Preço unitário deve ser positivo'),
+	discountType: z.enum(['PERCENTAGE', 'FIXED']).optional(),
+	discountValue: z.number().min(0, 'Valor do desconto deve ser positivo').optional(),
 	itemType: z.enum(['RENTAL', 'SALE'])
+}).refine((data) => {
+	// Se há desconto, o tipo deve ser especificado
+	return !data.discountValue || data.discountType;
+}, {
+	message: 'Tipo de desconto é obrigatório quando há valor de desconto',
+	path: ['discountType']
+}).refine((data) => {
+	// Se o tipo é percentual, o valor não pode ser maior que 100
+	return data.discountType !== 'PERCENTAGE' || !data.discountValue || data.discountValue <= 100;
+}, {
+	message: 'Desconto percentual não pode ser maior que 100%',
+	path: ['discountValue']
 });
 
 const OrderPaymentSchema = z.object({
@@ -25,6 +40,8 @@ const OrderSchema = z.object({
 	rentalStartDate: z.string().transform((str) => new Date(str)).optional(),
 	rentalEndDate: z.string().transform((str) => new Date(str)).optional(),
 	notes: z.string().optional(),
+	discountType: z.enum(['PERCENTAGE', 'FIXED']).optional(),
+	discountValue: z.number().min(0, 'Valor do desconto deve ser positivo').optional(),
 	items: z.array(OrderItemSchema).min(1, 'Pelo menos um item é obrigatório'),
 	payments: z.array(OrderPaymentSchema).min(1, 'Pelo menos um meio de pagamento é obrigatório')
 }).refine((data) => {
@@ -33,6 +50,18 @@ const OrderSchema = z.object({
 }, {
 	message: 'Cliente é obrigatório para pedidos de aluguel',
 	path: ['customerId']
+}).refine((data) => {
+	// Se há desconto no pedido, o tipo deve ser especificado
+	return !data.discountValue || data.discountType;
+}, {
+	message: 'Tipo de desconto é obrigatório quando há valor de desconto',
+	path: ['discountType']
+}).refine((data) => {
+	// Se o tipo é percentual, o valor não pode ser maior que 100
+	return data.discountType !== 'PERCENTAGE' || !data.discountValue || data.discountValue <= 100;
+}, {
+	message: 'Desconto percentual do pedido não pode ser maior que 100%',
+	path: ['discountValue']
 });
 
 export const GET: RequestHandler = async ({ url, locals }) => {
@@ -139,7 +168,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				...item,
 				productId: parseInt(item.productId),
 				quantity: parseInt(item.quantity),
-				unitPrice: parseFloat(item.unitPrice)
+				unitPrice: parseFloat(item.unitPrice),
+				discountValue: item.discountValue ? parseFloat(item.discountValue) : undefined
 			}));
 		}
 		
@@ -155,6 +185,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			data.customerId = parseInt(data.customerId);
 		}
 		
+		if (data.discountValue) {
+			data.discountValue = parseFloat(data.discountValue);
+		}
+		
 		// Log each item's unitPrice type after conversion
 		if (data.items) {
 			data.items.forEach((item: any, index: number) => {
@@ -168,11 +202,39 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const orderCount = await prisma.order.count();
 		const orderNumber = `ORD-${String(orderCount + 1).padStart(6, '0')}`;
 
-		// Calculate total amount
-		let totalAmount = 0;
+		// Calculate amounts with discount logic
+		let subtotalAmount = 0;
+		let processedItems = [...validatedData.items];
+		
+		// If there's an order-level discount, distribute it across items
+		if (validatedData.discountType && validatedData.discountValue) {
+			const itemDiscounts = distributeOrderDiscount(
+				validatedData.items,
+				validatedData.discountType,
+				validatedData.discountValue
+			);
+			
+			processedItems = validatedData.items.map((item, index) => ({
+				...item,
+				discountType: itemDiscounts[index].discountType,
+				discountValue: (item.discountValue || 0) + itemDiscounts[index].discountValue
+			}));
+		}
+		
+		// Calculate subtotal and total amounts
+		for (const item of processedItems) {
+			subtotalAmount += item.unitPrice * item.quantity;
+		}
+		
+		let totalAmount = subtotalAmount;
+		
+		// Apply order-level discount to total
+		if (validatedData.discountType && validatedData.discountValue) {
+			totalAmount = applyDiscount(subtotalAmount, validatedData.discountType, validatedData.discountValue);
+		}
 		
 		// Validate products and stock
-		for (const item of validatedData.items) {
+		for (const item of processedItems) {
 			const product = await prisma.product.findUnique({
 				where: { id: item.productId }
 			});
@@ -205,8 +267,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					{ status: 400 }
 				);
 			}
-
-			totalAmount += item.unitPrice * item.quantity;
 		}
 		
 		// Validate payment methods
@@ -242,6 +302,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					attendantId: validatedData.attendantId,
 					orderNumber,
 					orderType: validatedData.orderType,
+					subtotalAmount,
+					discountType: validatedData.discountType || null,
+					discountValue: validatedData.discountValue || null,
 					totalAmount,
 					orderDate: validatedData.orderDate,
 					rentalStartDate: validatedData.rentalStartDate,
@@ -252,14 +315,22 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			});
 
 			// Create order items and update stock
-			for (const item of validatedData.items) {
+			for (const item of processedItems) {
+				const itemTotalPrice = applyDiscount(
+					item.unitPrice * item.quantity,
+					item.discountType || 'FIXED',
+					item.discountValue || 0
+				);
+				
 				await tx.orderItem.create({
 					data: {
 						orderId: newOrder.id,
 						productId: item.productId,
 						quantity: item.quantity,
 						unitPrice: item.unitPrice,
-						totalPrice: item.unitPrice * item.quantity,
+						discountType: item.discountType || null,
+						discountValue: item.discountValue || null,
+						totalPrice: itemTotalPrice,
 						itemType: item.itemType
 					}
 				});

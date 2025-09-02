@@ -3,8 +3,12 @@
 	import { customers } from '$lib/stores/customers.js';
 	import { products } from '$lib/stores/products.js';
 	import { employees } from '$lib/stores/employees.js';
+	import { calculateDiscount, applyDiscount, distributeOrderDiscount } from '$lib/utils/validation.js';
 	
 	const dispatch = createEventDispatcher();
+	
+	// Active tab
+	let activeTab: 'items' | 'order' = 'items';
 	
 	let selectedCustomerId = '';
 	let selectedAttendantId = '';
@@ -13,12 +17,20 @@
 	let rentalStartDate = '';
 	let rentalEndDate = '';
 	let notes = '';
+	
+	// Order-level discount fields
+	let orderDiscountType: 'PERCENTAGE' | 'FIXED' | '' = '';
+	let orderDiscountValue: number = 0;
+	
 	let orderItems: Array<{
 		productId: number;
 		product?: any;
 		quantity: number;
 		unitPrice: number;
 		itemType: 'RENTAL' | 'SALE';
+		// Item-level discount fields
+		discountType?: 'PERCENTAGE' | 'FIXED' | '';
+		discountValue?: number;
 	}> = [];
 	
 	// Payment methods data
@@ -48,6 +60,7 @@
 	let customersData: any;
 	let employeesData: any;
 	let productsData: any;
+	let subtotalAmount: number;
 	let totalAmount: number;
 	let totalPayments: number;
 	let paymentBalance: number;
@@ -58,7 +71,26 @@
 		customersData = $customers;
 		employeesData = $employees;
 		productsData = $products;
-		totalAmount = orderItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+		
+		// Calculate subtotal (before order discount)
+		subtotalAmount = orderItems.reduce((sum, item) => {
+			const itemSubtotal = item.quantity * item.unitPrice;
+			const itemDiscountType = item.discountType as 'PERCENTAGE' | 'FIXED' | undefined;
+			const itemDiscountValue = item.discountValue || 0;
+			
+			if (itemDiscountType && itemDiscountValue > 0) {
+				return sum + applyDiscount(itemSubtotal, itemDiscountType, itemDiscountValue);
+			}
+			return sum + itemSubtotal;
+		}, 0);
+		
+		// Calculate total amount (after order discount)
+		if (orderDiscountType && orderDiscountValue > 0) {
+			totalAmount = applyDiscount(subtotalAmount, orderDiscountType as 'PERCENTAGE' | 'FIXED', orderDiscountValue);
+		} else {
+			totalAmount = subtotalAmount;
+		}
+		
 		totalPayments = orderPayments.reduce((sum, payment) => sum + payment.amount, 0);
 		paymentBalance = totalAmount - totalPayments;
 		isRental = orderType === 'RENTAL';
@@ -134,7 +166,9 @@
 				product: product,
 				quantity: 1,
 				unitPrice: defaultPrice,
-				itemType: orderType
+				itemType: orderType,
+				discountType: '',
+				discountValue: 0
 			}];
 		}
 		
@@ -158,6 +192,44 @@
 		// Ensure price is a valid number
 		const validPrice = isNaN(price) ? 0 : price;
 		orderItems[index].unitPrice = validPrice;
+	}
+	
+	// Discount functions
+	function updateItemDiscountType(index: number, discountType: string) {
+		orderItems[index].discountType = discountType as 'PERCENTAGE' | 'FIXED' | '';
+		if (!discountType) {
+			orderItems[index].discountValue = 0;
+		}
+	}
+	
+	function updateItemDiscountValue(index: number, discountValue: number) {
+		const validValue = isNaN(discountValue) ? 0 : Math.max(0, discountValue);
+		orderItems[index].discountValue = validValue;
+	}
+	
+	function applyOrderDiscountToItems() {
+		if (!orderDiscountType || orderDiscountValue <= 0) return;
+		
+		const itemsForDistribution = orderItems.map(item => ({
+			unitPrice: item.unitPrice,
+			quantity: item.quantity
+		}));
+		
+		const distributedDiscounts = distributeOrderDiscount(
+			itemsForDistribution, 
+			orderDiscountType as 'PERCENTAGE' | 'FIXED', 
+			orderDiscountValue
+		);
+		
+		orderItems = orderItems.map((item, index) => ({
+			...item,
+			discountType: distributedDiscounts[index].discountType,
+			discountValue: distributedDiscounts[index].discountValue
+		}));
+		
+		// Clear order-level discount after distribution
+		orderDiscountType = '';
+		orderDiscountValue = 0;
 	}
 	
 	function addPayment() {
@@ -275,11 +347,19 @@
 			rentalStartDate: rentalStartDate ? new Date(rentalStartDate) : undefined,
 			rentalEndDate: rentalEndDate ? new Date(rentalEndDate) : undefined,
 			notes,
+			// Order-level discount
+			subtotalAmount: parseFloat(subtotalAmount.toString()),
+			discountType: orderDiscountType || undefined,
+			discountValue: orderDiscountType && orderDiscountValue > 0 ? parseFloat(orderDiscountValue.toString()) : undefined,
+			totalAmount: parseFloat(totalAmount.toString()),
 			items: orderItems.map(item => ({
 				productId: parseInt(item.productId.toString()),
 				quantity: parseInt(item.quantity.toString()),
 				unitPrice: parseFloat(item.unitPrice.toString()),
-				itemType: item.itemType
+				itemType: item.itemType,
+				// Item-level discount
+				discountType: item.discountType || undefined,
+				discountValue: item.discountType && item.discountValue && item.discountValue > 0 ? parseFloat(item.discountValue.toString()) : undefined
 			})),
 			payments: orderPayments.map(payment => ({
 				paymentMethodId: parseInt(payment.paymentMethodId.toString()),
@@ -314,7 +394,7 @@
 	<!-- svelte-ignore a11y-click-events-have-key-events -->
 	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 	<div 
-		class="relative top-4 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-lg rounded-md bg-white max-h-screen overflow-y-auto" 
+		class="relative top-2 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-5/6 xl:w-4/5 shadow-lg rounded-md bg-white max-h-screen overflow-y-auto" 
 		on:click|stopPropagation
 		on:keydown|stopPropagation
 		tabindex="-1"
@@ -334,13 +414,302 @@
 			</button>
 		</div>
 		
+		<!-- Tabs Navigation -->
+		<div class="border-b border-gray-200 mt-4">
+			<nav class="-mb-px flex space-x-8">
+				<button
+					type="button"
+					on:click={() => activeTab = 'items'}
+					class="{activeTab === 'items' 
+						? 'border-primary-500 text-primary-600' 
+						: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+					} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+				>
+					<svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M9 21h6" />
+					</svg>
+					Itens ({orderItems.length})
+				</button>
+				<button
+					type="button"
+					on:click={() => activeTab = 'order'}
+					class="{activeTab === 'order' 
+						? 'border-primary-500 text-primary-600' 
+						: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+					} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+				>
+					<svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+					</svg>
+					Informações do Pedido
+				</button>
+			</nav>
+		</div>
+		
 		<!-- Modal Body -->
 		<form on:submit|preventDefault={handleSubmit} class="mt-4">
-			<div class="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
-				<!-- Left Column - Order Info -->
-				<div class="space-y-4">
-					<h4 class="text-md font-medium text-gray-900">Informações do Pedido</h4>
+			{#if activeTab === 'items'}
+				<!-- Items Tab -->
+				<div class="space-y-6">
+					<!-- Product Search -->
+					<div class="bg-gray-50 p-4 rounded-lg">
+						<h4 class="text-md font-medium text-gray-900 mb-4">Adicionar Produtos</h4>
+						<div class="relative">
+							<input
+								type="text"
+								bind:value={productSearch}
+								on:input={searchProducts}
+								on:focus={() => showProductDropdown = true}
+								class="form-input w-full"
+								placeholder="Buscar produto por nome ou SKU..."
+							/>
+							{#if showProductDropdown && productsList.length > 0}
+								<div class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+									{#each productsList as product}
+										<button
+											type="button"
+											on:click={() => addProduct(product)}
+											class="w-full text-left px-3 py-2 hover:bg-gray-100 focus:bg-gray-100"
+											disabled={product.stockQuantity === 0}
+										>
+											<div class="flex justify-between">
+												<div>
+													<div class="font-medium">{product.name}</div>
+													<div class="text-sm text-gray-500">{product.sku} - Estoque: {product.stockQuantity}</div>
+												</div>
+												<div class="text-sm">
+													<div>A: R$ {product.rentalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+													<div>V: R$ {product.salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+												</div>
+											</div>
+										</button>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					</div>
 					
+					<!-- Order Items with Enhanced Cards -->
+					{#if orderItems.length > 0}
+						<div class="space-y-4">
+							<h5 class="text-lg font-medium text-gray-900">Itens do Pedido</h5>
+							{#each orderItems as item, index}
+								<div class="border rounded-lg p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
+									<!-- Item Header -->
+									<div class="flex justify-between items-start mb-4">
+										<div class="flex-1">
+											<h6 class="font-semibold text-lg text-gray-900">{item.product?.name}</h6>
+											<div class="text-sm text-gray-500 mt-1">
+												<span class="bg-gray-100 px-2 py-1 rounded">{item.product?.sku}</span>
+												<span class="ml-2">Estoque: {item.product?.stockQuantity}</span>
+											</div>
+										</div>
+										<!-- svelte-ignore a11y_consider_explicit_label -->
+										<button
+											type="button"
+											on:click={() => removeItem(index)}
+											class="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-50 transition-colors"
+											title="Remover item"
+										>
+											<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+											</svg>
+										</button>
+									</div>
+								
+									<!-- Item Fields Grid -->
+									<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label class="block text-sm font-medium text-gray-700 mb-1">Quantidade *</label>
+											<input
+												type="number"
+												min="1"
+												max={item.product?.stockQuantity}
+												value={item.quantity}
+												on:change={(e) => {
+													const target = e.target as HTMLInputElement;
+													if (target) {
+														updateItemQuantity(index, parseInt(target.value));
+													}
+												}}
+												class="form-input"
+											/>
+										</div>
+										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label class="block text-sm font-medium text-gray-700 mb-1">Preço Unitário *</label>
+											<input
+												type="number"
+												min="0"
+												step="0.01"
+												value={item.unitPrice}
+												on:change={(e) => {
+													const target = e.target as HTMLInputElement;
+													if (target) {
+														const value = parseFloat(target.value);
+														updateItemPrice(index, isNaN(value) ? 0 : value);
+													}
+												}}
+												class="form-input"
+												placeholder="0,00"
+											/>
+										</div>
+										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Desconto</label>
+											<select
+												value={item.discountType || ''}
+												on:change={(e) => {
+													const target = e.target as HTMLSelectElement;
+													if (target) {
+														updateItemDiscountType(index, target.value);
+													}
+												}}
+												class="form-input"
+											>
+												<option value="">Sem desconto</option>
+												<option value="PERCENTAGE">Percentual (%)</option>
+												<option value="FIXED">Valor Fixo (R$)</option>
+											</select>
+										</div>
+										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label class="block text-sm font-medium text-gray-700 mb-1">
+												{item.discountType === 'PERCENTAGE' ? 'Desconto (%)' : 'Desconto (R$)'}
+											</label>
+											<input
+												type="number"
+												min="0"
+												max={item.discountType === 'PERCENTAGE' ? 100 : undefined}
+												step={item.discountType === 'PERCENTAGE' ? '1' : '0.01'}
+												value={item.discountValue || 0}
+												on:change={(e) => {
+													const target = e.target as HTMLInputElement;
+													if (target) {
+														const value = parseFloat(target.value);
+														updateItemDiscountValue(index, isNaN(value) ? 0 : value);
+													}
+												}}
+												class="form-input"
+												placeholder="0"
+												disabled={!item.discountType}
+											/>
+										</div>
+									</div>
+								
+									<!-- Item Totals -->
+									<div class="flex justify-between items-center pt-4 border-t border-gray-200">
+										<div class="flex space-x-6 text-sm">
+											<span class="text-gray-600">Subtotal: <span class="font-medium">R$ {(item.quantity * item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></span>
+											{#if item.discountType && item.discountValue && item.discountValue > 0}
+												<span class="text-red-600">Desconto: <span class="font-medium">-R$ {calculateDiscount(item.quantity * item.unitPrice, item.discountType, item.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></span>
+											{/if}
+										</div>
+										<div class="text-lg font-semibold text-gray-900">
+											Total: R$ {
+												(() => {
+													const itemSubtotal = item.quantity * item.unitPrice;
+													if (item.discountType && item.discountValue && item.discountValue > 0) {
+														return applyDiscount(itemSubtotal, item.discountType, item.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+													}
+													return itemSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+												})()
+											}
+										</div>
+									</div>
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<div class="text-center py-12 bg-gray-50 rounded-lg">
+							<svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 48 48">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M9 21h6" />
+							</svg>
+							<h3 class="text-lg font-medium text-gray-900 mb-2">Nenhum item adicionado</h3>
+							<p class="text-gray-500">Use a busca acima para adicionar produtos ao pedido</p>
+						</div>
+					{/if}
+					
+					{#if errors.items}
+						<p class="text-sm text-red-600 bg-red-50 p-3 rounded-md">{errors.items}</p>
+					{/if}
+					
+					<!-- Order Level Discount Section -->
+					{#if orderItems.length > 0}
+						<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+							<h5 class="text-md font-medium text-yellow-800 mb-3">Desconto no Pedido</h5>
+							<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+								<div>
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Desconto</label>
+									<select
+										bind:value={orderDiscountType}
+										class="form-input"
+									>
+										<option value="">Sem desconto</option>
+										<option value="PERCENTAGE">Percentual (%)</option>
+										<option value="FIXED">Valor Fixo (R$)</option>
+									</select>
+								</div>
+								<div>
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label class="block text-sm font-medium text-gray-700 mb-1">
+										{orderDiscountType === 'PERCENTAGE' ? 'Desconto (%)' : 'Desconto (R$)'}
+									</label>
+									<input
+										type="number"
+										min="0"
+										max={orderDiscountType === 'PERCENTAGE' ? 100 : undefined}
+										step={orderDiscountType === 'PERCENTAGE' ? '1' : '0.01'}
+										bind:value={orderDiscountValue}
+										class="form-input"
+										placeholder="0"
+										disabled={!orderDiscountType}
+									/>
+								</div>
+								<div class="flex items-end">
+									<button
+										type="button"
+										on:click={applyOrderDiscountToItems}
+										class="btn btn-secondary btn-sm"
+										disabled={!orderDiscountType || orderDiscountValue <= 0}
+									>
+										Distribuir aos Itens
+									</button>
+								</div>
+							</div>
+							<div class="text-sm text-gray-600 mt-2">
+								O desconto será aplicado proporcionalmente a todos os itens
+							</div>
+						</div>
+					{/if}
+					
+					<!-- Order Summary -->
+					<div class="bg-gray-50 border rounded-lg p-4 mt-6">
+						<h5 class="font-medium text-gray-900 mb-3">Resumo do Pedido</h5>
+						<div class="space-y-2 text-sm">
+							<div class="flex justify-between">
+								<span>Subtotal:</span>
+								<span class="font-medium">R$ {subtotalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+							</div>
+							{#if orderDiscountType && orderDiscountValue > 0}
+								<div class="flex justify-between text-red-600">
+									<span>Desconto no pedido:</span>
+									<span class="font-medium">-R$ {calculateDiscount(subtotalAmount, orderDiscountType, orderDiscountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+								</div>
+							{/if}
+							<div class="flex justify-between text-lg font-semibold border-t pt-2">
+								<span>Total:</span>
+								<span>R$ {totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+							</div>
+						</div>
+					</div>
+				</div>
+
+			{:else if activeTab === 'order'}
+				<!-- Order Information Tab -->
+				<div class="space-y-6">
 					<!-- Order Type -->
 					<div>
 						<!-- svelte-ignore a11y_label_has_associated_control -->
@@ -397,7 +766,7 @@
 							<p class="mt-1 text-sm text-red-600">{errors.customer}</p>
 						{/if}
 					</div>
-									
+								
 					<!-- Attendant Selection -->
 					<div>
 						<label for="attendant" class="form-label">Atendente *</label>
@@ -483,270 +852,138 @@
 							placeholder="Observações sobre o pedido..."
 						></textarea>
 					</div>
-				</div>
-				
-				<!-- Right Column - Products -->
-				<div class="space-y-4">
-					<h4 class="text-md font-medium text-gray-900">Produtos</h4>
-					
-					<!-- Product Search -->
-					<div class="relative">
-						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label class="form-label">Adicionar produto</label>
-						<input
-							type="text"
-							bind:value={productSearch}
-							on:input={searchProducts}
-							on:focus={() => showProductDropdown = true}
-							class="form-input"
-							placeholder="Buscar produto por nome ou SKU..."
-						/>
-						{#if showProductDropdown && productsList.length > 0}
-							<div class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
-								{#each productsList as product}
-									<button
-										type="button"
-										on:click={() => addProduct(product)}
-										class="w-full text-left px-3 py-2 hover:bg-gray-100 focus:bg-gray-100"
-										disabled={product.stockQuantity === 0}
-									>
-										<div class="flex justify-between">
-											<div>
-												<div class="font-medium">{product.name}</div>
-												<div class="text-sm text-gray-500">{product.sku} - Estoque: {product.stockQuantity}</div>
-											</div>
-											<div class="text-sm">
-												<div>A: R$ {product.rentalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-												<div>V: R$ {product.salePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-											</div>
-										</div>
-									</button>
+
+					<!-- Payment Methods Section -->
+					<div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+						<h4 class="text-lg font-medium text-blue-800 mb-4">Meios de Pagamento</h4>
+						
+						<!-- Payment Method Selection -->
+						<div class="mb-4">
+							<!-- svelte-ignore a11y_label_has_associated_control -->
+							<label class="form-label">Adicionar meio de pagamento</label>
+							<select
+								bind:value={selectedPaymentMethodId}
+								on:change={addPayment}
+								class="form-input"
+							>
+								<option value="">Selecione um meio de pagamento</option>
+								{#each paymentMethods as paymentMethod}
+									{#if !orderPayments.find(p => p.paymentMethodId === paymentMethod.id)}
+										<option value={paymentMethod.id}>{paymentMethod.name}</option>
+									{/if}
 								{/each}
-							</div>
-						{/if}
-					</div>
-					
-					<!-- Order Items -->
-					{#if orderItems.length > 0}
-						<div class="space-y-3">
-							<h5 class="text-sm font-medium text-gray-700">Itens do pedido</h5>
-							{#each orderItems as item, index}
-								<div class="border rounded-lg p-3 bg-gray-50">
-									<div class="flex justify-between items-start mb-2">
-										<div class="flex-1">
-											<div class="font-medium text-sm">{item.product?.name}</div>
-											<div class="text-xs text-gray-500">{item.product?.sku}</div>
+							</select>
+						</div>
+						
+						<!-- Payment Items -->
+						{#if orderPayments.length > 0}
+							<div class="space-y-3">
+								<h5 class="text-sm font-medium text-gray-700">Pagamentos do pedido</h5>
+								{#each orderPayments as payment, index}
+									<div class="border rounded-lg p-4 bg-white">
+										<div class="flex justify-between items-start mb-3">
+											<div class="flex-1">
+												<div class="font-medium text-sm">{payment.paymentMethod?.name}</div>
+												<div class="text-xs text-gray-500">{payment.paymentMethod?.description || ''}</div>
+											</div>
+											<!-- svelte-ignore a11y_consider_explicit_label -->
+											<button
+												type="button"
+												on:click={() => removePayment(index)}
+												class="text-red-600 hover:text-red-800 p-1 rounded"
+												title="Remover pagamento"
+											>
+												<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+												</svg>
+											</button>
 										</div>
-										<!-- svelte-ignore a11y_consider_explicit_label -->
-										<button
-											type="button"
-											on:click={() => removeItem(index)}
-											class="text-red-600 hover:text-red-800"
-											title="Remover item"
-										>
-											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-											</svg>
-										</button>
-									</div>
-									<div class="grid grid-cols-3 gap-2">
-										<div>
-											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label class="text-xs text-gray-600">Qtd</label>
-											<input
-												type="number"
-												min="1"
-												max={item.product?.stockQuantity}
-												value={item.quantity}
-												on:change={(e) => {
-													const target = e.target as HTMLInputElement;
-													if (target) {
-														updateItemQuantity(index, parseInt(target.value));
-													}
-												}}
-												class="w-full text-sm border border-gray-300 rounded px-2 py-1"
-											/>
-										</div>
-										<div>
-											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label class="text-xs text-gray-600">Preço unit.</label>
-											<input
-												type="number"
-												min="0"
-												step="0.01"
-												value={item.unitPrice}
-												on:change={(e) => {
-													const target = e.target as HTMLInputElement;
-													if (target) {
-														const value = parseFloat(target.value);
-														updateItemPrice(index, isNaN(value) ? 0 : value);
-													}
-												}}
-												class="w-full text-sm border border-gray-300 rounded px-2 py-1"
-											/>
-										</div>
-										<div>
-											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label class="text-xs text-gray-600">Total</label>
-											<div class="text-sm font-medium py-1">
-												R$ {(item.quantity * item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+										<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+											<div>
+												<!-- svelte-ignore a11y_label_has_associated_control -->
+												<label class="block text-xs font-medium text-gray-700 mb-1">Valor *</label>
+												<input
+													type="number"
+													min="0"
+													step="0.01"
+													max={totalAmount}
+													value={payment.amount}
+													on:change={(e) => {
+														const target = e.target as HTMLInputElement;
+														if (target) {
+															const value = parseFloat(target.value);
+															updatePaymentAmount(index, isNaN(value) ? 0 : value);
+														}
+													}}
+													class="form-input"
+													placeholder="0,00"
+												/>
+											</div>
+											<div>
+												<!-- svelte-ignore a11y_label_has_associated_control -->
+												<label class="block text-xs font-medium text-gray-700 mb-1">Observações</label>
+												<input
+													type="text"
+													value={payment.notes || ''}
+													on:change={(e) => {
+														const target = e.target as HTMLInputElement;
+														if (target) {
+															updatePaymentNotes(index, target.value);
+														}
+													}}
+													class="form-input"
+													placeholder="Opcional"
+												/>
 											</div>
 										</div>
 									</div>
-								</div>
-							{/each}
-							
-							<!-- Total -->
-							<div class="border-t pt-3">
-								<div class="flex justify-between items-center font-semibold">
-									<span>Total do pedido:</span>
-									<span class="text-lg">R$ {totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-								</div>
-							</div>
-						</div>
-					{:else}
-						<div class="text-center py-8 text-gray-500">
-							<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 48 48">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M9 21h6" />
-							</svg>
-							<p class="mt-2">Nenhum produto adicionado</p>
-							<p class="text-sm">Use a busca acima para adicionar produtos</p>
-						</div>
-					{/if}
-					
-					{#if errors.items}
-						<p class="text-sm text-red-600">{errors.items}</p>
-					{/if}
-				</div>
-				
-				<!-- Third Column - Payments -->
-				<div class="space-y-4 xl:col-span-1 lg:col-span-2">
-					<h4 class="text-md font-medium text-gray-900">Meios de Pagamento</h4>
-					
-					<!-- Payment Method Selection -->
-					<div class="relative">
-						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label class="form-label">Adicionar meio de pagamento</label>
-						<select
-							bind:value={selectedPaymentMethodId}
-							on:change={addPayment}
-							class="form-input"
-						>
-							<option value="">Selecione um meio de pagamento</option>
-							{#each paymentMethods as paymentMethod}
-								{#if !orderPayments.find(p => p.paymentMethodId === paymentMethod.id)}
-									<option value={paymentMethod.id}>{paymentMethod.name}</option>
-								{/if}
-							{/each}
-						</select>
-					</div>
-					
-					<!-- Payment Items -->
-					{#if orderPayments.length > 0}
-						<div class="space-y-3">
-							<h5 class="text-sm font-medium text-gray-700">Pagamentos do pedido</h5>
-							{#each orderPayments as payment, index}
-								<div class="border rounded-lg p-3 bg-gray-50">
-									<div class="flex justify-between items-start mb-2">
-										<div class="flex-1">
-											<div class="font-medium text-sm">{payment.paymentMethod?.name}</div>
-											<div class="text-xs text-gray-500">{payment.paymentMethod?.description || ''}</div>
+								{/each}
+								
+								<!-- Payment Summary -->
+								<div class="border-t pt-4 bg-gray-50 rounded-lg p-4">
+									<div class="space-y-2 text-sm">
+										<div class="flex justify-between">
+											<span>Total do pedido:</span>
+											<span class="font-medium">R$ {totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
 										</div>
-										<!-- svelte-ignore a11y_consider_explicit_label -->
-										<button
-											type="button"
-											on:click={() => removePayment(index)}
-											class="text-red-600 hover:text-red-800"
-											title="Remover pagamento"
-										>
-											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-											</svg>
-										</button>
-									</div>
-									<div class="grid grid-cols-2 gap-2">
-										<div>
-											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label class="text-xs text-gray-600">Valor</label>
-											<input
-												type="number"
-												min="0"
-												step="0.01"
-												max={totalAmount}
-												value={payment.amount}
-												on:change={(e) => {
-													const target = e.target as HTMLInputElement;
-													if (target) {
-														const value = parseFloat(target.value);
-														updatePaymentAmount(index, isNaN(value) ? 0 : value);
-													}
-												}}
-												class="w-full text-sm border border-gray-300 rounded px-2 py-1"
-												placeholder="0,00"
-											/>
+										<div class="flex justify-between">
+											<span>Total pago:</span>
+											<span class="font-medium">R$ {totalPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
 										</div>
-										<div>
-											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label class="text-xs text-gray-600">Observações</label>
-											<input
-												type="text"
-												value={payment.notes || ''}
-												on:change={(e) => {
-													const target = e.target as HTMLInputElement;
-													if (target) {
-														updatePaymentNotes(index, target.value);
-													}
-												}}
-												class="w-full text-sm border border-gray-300 rounded px-2 py-1"
-												placeholder="Opcional"
-											/>
+										<div class="flex justify-between text-sm font-semibold border-t pt-2">
+											<span>Saldo:</span>
+											<span class="{paymentBalance > 0.01 ? 'text-red-600' : paymentBalance < -0.01 ? 'text-orange-600' : 'text-green-600'}">
+												R$ {paymentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+											</span>
 										</div>
-									</div>
-								</div>
-							{/each}
-							
-							<!-- Payment Summary -->
-							<div class="border-t pt-3 space-y-2">
-								<div class="flex justify-between items-center text-sm">
-									<span>Total do pedido:</span>
-									<span class="font-medium">R$ {totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-								</div>
-								<div class="flex justify-between items-center text-sm">
-									<span>Total pago:</span>
-									<span class="font-medium">R$ {totalPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-								</div>
-								<div class="flex justify-between items-center text-sm font-semibold border-t pt-2">
-									<span>Saldo:</span>
-									<span class="{paymentBalance > 0.01 ? 'text-red-600' : paymentBalance < -0.01 ? 'text-orange-600' : 'text-green-600'}">
-										R$ {paymentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-									</span>
-								</div>
-								{#if Math.abs(paymentBalance) > 0.01}
-									<div class="text-xs text-gray-500">
-										{#if paymentBalance > 0}
-											Faltam R$ {paymentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para quitar
-										{:else}
-											Valor excedente de R$ {Math.abs(paymentBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+										{#if Math.abs(paymentBalance) > 0.01}
+											<div class="text-xs text-gray-500 mt-1">
+												{#if paymentBalance > 0}
+													Faltam R$ {paymentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para quitar
+												{:else}
+													Valor excedente de R$ {Math.abs(paymentBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+												{/if}
+											</div>
 										{/if}
 									</div>
-								{/if}
+								</div>
 							</div>
-						</div>
-					{:else}
-						<div class="text-center py-8 text-gray-500">
-							<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 48 48">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v2a2 2 0 002 2z" />
-							</svg>
-							<p class="mt-2">Nenhum meio de pagamento adicionado</p>
-							<p class="text-sm">Selecione os meios de pagamento acima</p>
-						</div>
-					{/if}
-					
-					{#if errors.payments}
-						<p class="text-sm text-red-600">{errors.payments}</p>
-					{/if}
+						{:else}
+							<div class="text-center py-8 text-gray-500">
+								<svg class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 48 48">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v2a2 2 0 002 2z" />
+								</svg>
+								<p class="font-medium">Nenhum meio de pagamento adicionado</p>
+								<p class="text-sm">Selecione os meios de pagamento acima</p>
+							</div>
+						{/if}
+						
+						{#if errors.payments}
+							<p class="text-sm text-red-600 bg-red-50 p-3 rounded-md mt-3">{errors.payments}</p>
+						{/if}
+					</div>
 				</div>
-			</div>
+			{/if}
 			
 			<!-- Modal Footer -->
 			<div class="flex items-center justify-end space-x-3 pt-6 border-t mt-6">

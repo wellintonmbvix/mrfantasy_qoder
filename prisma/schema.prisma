@@ -101,6 +101,9 @@ model Order {
   attendantId     Int?        @map("attendant_id")
   orderNumber     String      @unique @map("order_number")
   orderType       OrderType   @map("order_type")
+  subtotalAmount  Decimal     @map("subtotal_amount") @db.Decimal(10, 2)
+  discountType    DiscountType? @map("discount_type")
+  discountValue   Decimal?    @map("discount_value") @db.Decimal(10, 2)
   totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
   status          OrderStatus @default(PENDING)
   orderDate       DateTime    @map("order_date")
@@ -122,14 +125,16 @@ model Order {
 }
 
 model OrderItem {
-  id         Int      @id @default(autoincrement())
-  orderId    Int      @map("order_id")
-  productId  Int      @map("product_id")
-  quantity   Int
-  unitPrice  Decimal  @map("unit_price") @db.Decimal(10, 2)
-  totalPrice Decimal  @map("total_price") @db.Decimal(10, 2)
-  itemType   ItemType @map("item_type")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id            Int          @id @default(autoincrement())
+  orderId       Int          @map("order_id")
+  productId     Int          @map("product_id")
+  quantity      Int
+  unitPrice     Decimal      @map("unit_price") @db.Decimal(10, 2)
+  discountType  DiscountType? @map("discount_type")
+  discountValue Decimal?     @map("discount_value") @db.Decimal(10, 2)
+  totalPrice    Decimal      @map("total_price") @db.Decimal(10, 2)
+  itemType      ItemType     @map("item_type")
+  createdAt     DateTime     @default(now()) @map("created_at")
 
   // Relations
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -270,4 +275,9 @@ enum InventoryOperation {
   RETURN
   ADJUSTMENT
   DAMAGE
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
 }

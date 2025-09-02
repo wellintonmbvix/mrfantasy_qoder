@@ -5,6 +5,8 @@ interface OrderItem {
 	productId: number;
 	quantity: number;
 	unitPrice: number;
+	discountType?: 'PERCENTAGE' | 'FIXED';
+	discountValue?: number;
 	totalPrice: number;
 	itemType: 'RENTAL' | 'SALE';
 	product?: {
@@ -21,6 +23,9 @@ interface Order {
 	attendantId?: number;
 	orderNumber: string;
 	orderType: 'RENTAL' | 'SALE';
+	subtotalAmount: number;
+	discountType?: 'PERCENTAGE' | 'FIXED';
+	discountValue?: number;
 	totalAmount: number;
 	status: 'PENDING' | 'CONFIRMED' | 'DELIVERED' | 'RETURNED' | 'CANCELLED';
 	orderDate: string;
@@ -120,10 +125,14 @@ function createOrdersStore() {
 			rentalStartDate?: Date;
 			rentalEndDate?: Date;
 			notes?: string;
+			discountType?: 'PERCENTAGE' | 'FIXED';
+			discountValue?: number;
 			items: Array<{
 				productId: number;
 				quantity: number;
 				unitPrice: number;
+				discountType?: 'PERCENTAGE' | 'FIXED';
+				discountValue?: number;
 				itemType: 'RENTAL' | 'SALE';
 			}>;
 			payments: Array<{
