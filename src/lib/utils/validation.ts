@@ -277,6 +277,16 @@ export const companySchema = z.object({
 		.or(z.literal(''))
 });
 
+// Settings validation schemas
+export const settingsSchema = z.object({
+	databaseVersion: z.number()
+		.int('Versão do banco de dados deve ser um número inteiro')
+		.min(1, 'Versão do banco de dados deve ser pelo menos 1')
+		.max(999999, 'Versão do banco de dados muito alta'),
+	receiptInBobina: z.boolean(),
+	inhibitSurcharge: z.boolean()
+});
+
 // Phone number formatting utility
 export function formatPhone(value: string): string {
 	const cleaned = value.replace(/\D/g, '');

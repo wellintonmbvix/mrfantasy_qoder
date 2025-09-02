@@ -238,6 +238,17 @@ model Company {
   @@map("company")
 }
 
+model Settings {
+  id                     Int      @id @default(autoincrement())
+  databaseVersion        Int      @map("database_version")
+  receiptInBobina        Boolean  @default(false) @map("receipt_in_bobina")
+  inhibitSurcharge       Boolean  @default(false) @map("inhibit_surcharge")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
 // Enums
 enum UserRole {
   ADMIN

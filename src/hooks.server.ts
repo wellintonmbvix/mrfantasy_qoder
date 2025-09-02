@@ -39,7 +39,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.url.pathname.startsWith('/orders') ||
 		event.url.pathname.startsWith('/users') ||
 		event.url.pathname.startsWith('/employees') ||
-		event.url.pathname.startsWith('/company')) {
+		event.url.pathname.startsWith('/company') ||
+		event.url.pathname.startsWith('/settings')) {
 		
 		if (!event.locals.user) {
 			console.log('Protected route accessed without auth, redirecting to login'); // Debug log
@@ -66,6 +67,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	// Protect company route (Admin and Manager only)
 	if (event.url.pathname.startsWith('/company')) {
+		if (!event.locals.user || (event.locals.user.role !== 'ADMIN' && event.locals.user.role !== 'MANAGER')) {
+			return new Response('Forbidden', { status: 403 });
+		}
+	}
+
+	// Protect settings route (Admin and Manager only)
+	if (event.url.pathname.startsWith('/settings')) {
 		if (!event.locals.user || (event.locals.user.role !== 'ADMIN' && event.locals.user.role !== 'MANAGER')) {
 			return new Response('Forbidden', { status: 403 });
 		}
