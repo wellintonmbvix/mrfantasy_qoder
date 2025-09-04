@@ -139,8 +139,26 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			prisma.order.count({ where })
 		]);
 
+		// Serialize Decimal fields to numbers
+		const serializedOrders = orders.map(order => ({
+			...order,
+			subtotalAmount: Number(order.subtotalAmount),
+			totalAmount: Number(order.totalAmount),
+			discountValue: order.discountValue ? Number(order.discountValue) : null,
+			orderItems: order.orderItems.map(item => ({
+				...item,
+				unitPrice: Number(item.unitPrice),
+				totalPrice: Number(item.totalPrice),
+				discountValue: item.discountValue ? Number(item.discountValue) : null
+			})),
+			orderPayments: order.orderPayments.map(payment => ({
+				...payment,
+				amount: Number(payment.amount)
+			}))
+		}));
+
 		return json({
-			orders,
+			orders: serializedOrders,
 			pagination: {
 				page,
 				limit,
@@ -253,15 +271,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				);
 			}
 
-			// Verify product is available for the order type
-			if (validatedData.orderType === 'RENTAL' && !product.availableForRental) {
+			// Verify product is available for the item type
+			if (item.itemType === 'RENTAL' && !product.availableForRental) {
 				return json(
 					{ error: `${product.name} não está disponível para aluguel` },
 					{ status: 400 }
 				);
 			}
 
-			if (validatedData.orderType === 'SALE' && !product.availableForSale) {
+			if (item.itemType === 'SALE' && !product.availableForSale) {
 				return json(
 					{ error: `${product.name} não está disponível para venda` },
 					{ status: 400 }
@@ -403,7 +421,31 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		});
 
-		return json(createdOrder, { status: 201 });
+		// Serialize Decimal fields to numbers
+		const serializedCreatedOrder = {
+			...createdOrder,
+			subtotalAmount: Number(createdOrder!.subtotalAmount),
+			totalAmount: Number(createdOrder!.totalAmount),
+			discountValue: createdOrder!.discountValue ? Number(createdOrder!.discountValue) : null,
+			orderItems: createdOrder!.orderItems.map(item => ({
+				...item,
+				unitPrice: Number(item.unitPrice),
+				totalPrice: Number(item.totalPrice),
+				discountValue: item.discountValue ? Number(item.discountValue) : null,
+				product: {
+					...item.product,
+					costPrice: Number(item.product.costPrice),
+					rentalPrice: Number(item.product.rentalPrice),
+					salePrice: Number(item.product.salePrice)
+				}
+			})),
+			orderPayments: createdOrder!.orderPayments.map(payment => ({
+				...payment,
+				amount: Number(payment.amount)
+			}))
+		};
+
+		return json(serializedCreatedOrder, { status: 201 });
 	} catch (error) {
 		if (error instanceof z.ZodError) {
 			return json(

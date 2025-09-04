@@ -65,8 +65,16 @@ export const GET: RequestHandler = async ({ url }) => {
 			prisma.product.count({ where })
 		]);
 
+		// Serialize Decimal fields to numbers
+		const serializedProducts = products.map(product => ({
+			...product,
+			costPrice: Number(product.costPrice),
+			rentalPrice: Number(product.rentalPrice),
+			salePrice: Number(product.salePrice)
+		}));
+
 		return json({
-			products,
+			products: serializedProducts,
 			pagination: {
 				page,
 				limit,
@@ -115,7 +123,15 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 		});
 
-		return json(product, { status: 201 });
+		// Serialize Decimal fields to numbers
+		const serializedProduct = {
+			...product,
+			costPrice: Number(product.costPrice),
+			rentalPrice: Number(product.rentalPrice),
+			salePrice: Number(product.salePrice)
+		};
+
+		return json(serializedProduct, { status: 201 });
 	} catch (error) {
 		if (error instanceof z.ZodError) {
 			return json(

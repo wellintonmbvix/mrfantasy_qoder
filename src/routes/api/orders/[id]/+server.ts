@@ -53,7 +53,31 @@ export const GET: RequestHandler = async ({ params }) => {
 			return json({ error: 'Pedido não encontrado' }, { status: 404 });
 		}
 
-		return json(order);
+		// Serialize Decimal fields to numbers
+		const serializedOrder = {
+			...order,
+			subtotalAmount: Number(order.subtotalAmount),
+			totalAmount: Number(order.totalAmount),
+			discountValue: order.discountValue ? Number(order.discountValue) : null,
+			orderItems: order.orderItems.map(item => ({
+				...item,
+				unitPrice: Number(item.unitPrice),
+				totalPrice: Number(item.totalPrice),
+				discountValue: item.discountValue ? Number(item.discountValue) : null,
+				product: {
+					...item.product,
+					costPrice: Number(item.product.costPrice),
+					rentalPrice: Number(item.product.rentalPrice),
+					salePrice: Number(item.product.salePrice)
+				}
+			})),
+			orderPayments: order.orderPayments.map(payment => ({
+				...payment,
+				amount: Number(payment.amount)
+			}))
+		};
+
+		return json(serializedOrder);
 	} catch (error) {
 		return json({ error: 'Erro ao buscar pedido' }, { status: 500 });
 	}
@@ -175,7 +199,31 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 			}
 		});
 
-		return json(order);
+		// Serialize Decimal fields to numbers
+		const serializedOrder = {
+			...order,
+			subtotalAmount: Number(order.subtotalAmount),
+			totalAmount: Number(order.totalAmount),
+			discountValue: order.discountValue ? Number(order.discountValue) : null,
+			orderItems: order.orderItems.map(item => ({
+				...item,
+				unitPrice: Number(item.unitPrice),
+				totalPrice: Number(item.totalPrice),
+				discountValue: item.discountValue ? Number(item.discountValue) : null,
+				product: {
+					...item.product,
+					costPrice: Number(item.product.costPrice),
+					rentalPrice: Number(item.product.rentalPrice),
+					salePrice: Number(item.product.salePrice)
+				}
+			})),
+			orderPayments: order.orderPayments.map(payment => ({
+				...payment,
+				amount: Number(payment.amount)
+			}))
+		};
+
+		return json(serializedOrder);
 	} catch (error) {
 		if (error instanceof z.ZodError) {
 			return json(

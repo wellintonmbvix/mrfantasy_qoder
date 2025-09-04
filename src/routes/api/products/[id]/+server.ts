@@ -49,7 +49,21 @@ export const GET: RequestHandler = async ({ params }) => {
 			return json({ error: 'Produto não encontrado' }, { status: 404 });
 		}
 
-		return json(product);
+		// Serialize Decimal fields to numbers
+		const serializedProduct = {
+			...product,
+			costPrice: Number(product.costPrice),
+			rentalPrice: Number(product.rentalPrice),
+			salePrice: Number(product.salePrice),
+			orderItems: product.orderItems.map(item => ({
+				...item,
+				unitPrice: Number(item.unitPrice),
+				totalPrice: Number(item.totalPrice),
+				discountValue: item.discountValue ? Number(item.discountValue) : null
+			}))
+		};
+
+		return json(serializedProduct);
 	} catch (error) {
 		return json({ error: 'Erro ao buscar produto' }, { status: 500 });
 	}
@@ -101,7 +115,15 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 			}
 		});
 
-		return json(product);
+		// Serialize Decimal fields to numbers
+		const serializedProduct = {
+			...product,
+			costPrice: Number(product.costPrice),
+			rentalPrice: Number(product.rentalPrice),
+			salePrice: Number(product.salePrice)
+		};
+
+		return json(serializedProduct);
 	} catch (error) {
 		if (error instanceof z.ZodError) {
 			return json(

@@ -160,13 +160,17 @@
 		if (existingIndex >= 0) {
 			orderItems[existingIndex].quantity += 1;
 		} else {
-			const defaultPrice = isRental ? product.rentalPrice : product.salePrice;
+			// Se o produto está disponível para ambos (venda e aluguel), usar o tipo padrão do pedido
+			// mas permitir que o usuário altere depois
+			const defaultItemType = orderType;
+			const defaultPrice = defaultItemType === 'RENTAL' ? product.rentalPrice : product.salePrice;
+			
 			orderItems = [...orderItems, {
 				productId: product.id,
 				product: product,
 				quantity: 1,
 				unitPrice: defaultPrice,
-				itemType: orderType,
+				itemType: defaultItemType,
 				discountType: '',
 				discountValue: 0
 			}];
@@ -205,6 +209,23 @@
 	function updateItemDiscountValue(index: number, discountValue: number) {
 		const validValue = isNaN(discountValue) ? 0 : Math.max(0, discountValue);
 		orderItems[index].discountValue = validValue;
+	}
+
+	function updateItemType(index: number, itemType: 'RENTAL' | 'SALE') {
+		const item = orderItems[index];
+		if (!item.product) return;
+		
+		// Atualizar tipo do item
+		orderItems[index].itemType = itemType;
+		
+		// Atualizar preço unitário baseado no novo tipo
+		const newPrice = itemType === 'RENTAL' ? item.product.rentalPrice : item.product.salePrice;
+		orderItems[index].unitPrice = newPrice;
+	}
+
+	function canChangeItemType(product: any): boolean {
+		// Produto pode mudar tipo apenas se estiver disponível para ambos: venda e aluguel
+		return product && product.availableForRental && product.availableForSale;
 	}
 	
 	function applyOrderDiscountToItems() {
@@ -309,6 +330,18 @@
 			if (item.product && item.quantity > item.product.stockQuantity) {
 				errors.items = `Estoque insuficiente para ${item.product.name}`;
 				break;
+			}
+			
+			// Validate item type availability
+			if (item.product) {
+				if (item.itemType === 'RENTAL' && !item.product.availableForRental) {
+					errors.items = `${item.product.name} não está disponível para aluguel`;
+					break;
+				}
+				if (item.itemType === 'SALE' && !item.product.availableForSale) {
+					errors.items = `${item.product.name} não está disponível para venda`;
+					break;
+				}
 			}
 		}
 		
@@ -518,7 +551,7 @@
 									</div>
 								
 									<!-- Item Fields Grid -->
-									<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+									<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
 										<div>
 											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="block text-sm font-medium text-gray-700 mb-1">Quantidade *</label>
@@ -535,6 +568,30 @@
 												}}
 												class="form-input"
 											/>
+										</div>
+										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+											<select
+												value={item.itemType}
+												on:change={(e) => {
+													const target = e.target as HTMLSelectElement;
+													if (target) {
+														updateItemType(index, target.value as 'RENTAL' | 'SALE');
+													}
+												}}
+												class="form-input"
+												disabled={!canChangeItemType(item.product)}
+											>
+												<option value="RENTAL">Aluguel</option>
+												<option value="SALE">Venda</option>
+											</select>
+											{#if !canChangeItemType(item.product)}
+												<p class="text-xs text-gray-500 mt-1">
+													{item.product?.availableForRental && !item.product?.availableForSale ? 'Apenas aluguel' : 
+													 !item.product?.availableForRental && item.product?.availableForSale ? 'Apenas venda' : 'Indisponível'}
+												</p>
+											{/if}
 										</div>
 										<div>
 											<!-- svelte-ignore a11y_label_has_associated_control -->

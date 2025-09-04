@@ -49,7 +49,9 @@ export const load: PageServerLoad = async () => {
 		// Serialize Decimal fields to numbers
 		const serializedRecentOrders = recentOrders.map(order => ({
 			...order,
-			totalAmount: Number(order.totalAmount)
+			subtotalAmount: Number(order.subtotalAmount),
+			totalAmount: Number(order.totalAmount),
+			discountValue: order.discountValue ? Number(order.discountValue) : null
 		}));
 
 		const serializedLowStockProducts = lowStockProducts.map(product => ({
