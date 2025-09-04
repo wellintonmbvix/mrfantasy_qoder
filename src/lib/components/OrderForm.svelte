@@ -610,6 +610,7 @@
 												}}
 												class="form-input"
 												placeholder="0,00"
+												disabled={true}
 											/>
 										</div>
 										<div>
