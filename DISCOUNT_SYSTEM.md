@@ -154,6 +154,49 @@ const orderData = {
 3. **Tipo Obrigatório**: Se há valor de desconto, o tipo deve ser especificado
 4. **Consistência de Pagamento**: Total dos pagamentos deve ser igual ao total do pedido após desconto
 
+## Regras de Negócio - Status Automático
+
+### Confirmação Automática de Vendas
+
+O sistema implementa uma regra automática para definir o status inicial dos pedidos:
+
+- **Pedidos apenas com itens SALE**: Status inicial = `CONFIRMED`
+- **Pedidos com itens RENTAL ou mistos (SALE + RENTAL)**: Status inicial = `PENDING`
+
+```javascript
+// Exemplo 1: Pedido apenas com vendas - Status CONFIRMED
+const saleOnlyOrder = {
+  orderType: 'SALE',
+  items: [
+    { productId: 1, quantity: 1, unitPrice: 50, itemType: 'SALE' },
+    { productId: 2, quantity: 2, unitPrice: 25, itemType: 'SALE' }
+  ]
+  // Status será automaticamente definido como CONFIRMED
+};
+
+// Exemplo 2: Pedido com aluguel - Status PENDING
+const rentalOrder = {
+  orderType: 'RENTAL',
+  customerId: 1,
+  items: [
+    { productId: 1, quantity: 1, unitPrice: 50, itemType: 'RENTAL' }
+  ]
+  // Status será PENDING
+};
+
+// Exemplo 3: Pedido misto - Status PENDING
+const mixedOrder = {
+  orderType: 'SALE',
+  items: [
+    { productId: 1, quantity: 1, unitPrice: 50, itemType: 'SALE' },
+    { productId: 2, quantity: 1, unitPrice: 30, itemType: 'RENTAL' }
+  ]
+  // Status será PENDING devido ao item de aluguel
+};
+```
+
+**Justificativa**: Vendas diretas não necessitam de aprovação adicional e podem ser processadas imediatamente, enquanto aluguéis requerem validação de datas, condições do produto e outros aspectos operacionais.
+
 ## API Endpoints
 
 ### POST /api/orders

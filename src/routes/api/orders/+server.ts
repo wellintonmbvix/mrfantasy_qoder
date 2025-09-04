@@ -310,6 +310,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
+		// Determine order status based on items
+		// If all items are SALE type, mark order as CONFIRMED
+		const allItemsAreSale = processedItems.every(item => item.itemType === 'SALE');
+		const orderStatus = allItemsAreSale ? 'CONFIRMED' : 'PENDING';
+
 		// Create order in a transaction
 		const order = await prisma.$transaction(async (tx: any) => {
 			// Create the order
@@ -328,7 +333,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					rentalStartDate: validatedData.rentalStartDate,
 					rentalEndDate: validatedData.rentalEndDate,
 					notes: validatedData.notes || '',
-					status: 'PENDING'
+					status: orderStatus
 				}
 			});
 
