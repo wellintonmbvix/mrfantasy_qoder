@@ -9,7 +9,12 @@ const OrderUpdateSchema = z.object({
 	rentalStartDate: z.string().transform((str) => new Date(str)).optional(),
 	rentalEndDate: z.string().transform((str) => new Date(str)).optional(),
 	returnDate: z.string().transform((str) => new Date(str)).optional(),
-	notes: z.string().optional()
+	notes: z.string().optional(),
+	orderItems: z.array(z.object({
+		id: z.number().int().positive(),
+		itemTaken: z.boolean().optional(),
+		itemReturned: z.boolean().optional()
+	})).optional()
 });
 
 export const GET: RequestHandler = async ({ params }) => {
@@ -168,9 +173,39 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 			}
 		}
 
-		const order = await prisma.order.update({
+		const order = await prisma.$transaction(async (tx: any) => {
+			// Update order
+			const updatedOrder = await tx.order.update({
+				where: { id: orderId },
+				data: {
+					status: validatedData.status,
+					attendantId: validatedData.attendantId,
+					rentalStartDate: validatedData.rentalStartDate,
+					rentalEndDate: validatedData.rentalEndDate,
+					returnDate: validatedData.returnDate,
+					notes: validatedData.notes
+				}
+			});
+
+			// Update order items if provided
+			if (validatedData.orderItems) {
+				for (const itemUpdate of validatedData.orderItems) {
+					await tx.orderItem.update({
+						where: { id: itemUpdate.id },
+						data: {
+							itemTaken: itemUpdate.itemTaken,
+							itemReturned: itemUpdate.itemReturned
+						}
+					});
+				}
+			}
+
+			return updatedOrder;
+		});
+
+		// Fetch the updated order with all relations
+		const orderWithRelations = await prisma.order.findUnique({
 			where: { id: orderId },
-			data: validatedData,
 			include: {
 				customer: true,
 				user: {
@@ -201,11 +236,11 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 
 		// Serialize Decimal fields to numbers
 		const serializedOrder = {
-			...order,
-			subtotalAmount: Number(order.subtotalAmount),
-			totalAmount: Number(order.totalAmount),
-			discountValue: order.discountValue ? Number(order.discountValue) : null,
-			orderItems: order.orderItems.map(item => ({
+			...orderWithRelations,
+			subtotalAmount: Number(orderWithRelations!.subtotalAmount),
+			totalAmount: Number(orderWithRelations!.totalAmount),
+			discountValue: orderWithRelations!.discountValue ? Number(orderWithRelations!.discountValue) : null,
+			orderItems: orderWithRelations!.orderItems.map(item => ({
 				...item,
 				unitPrice: Number(item.unitPrice),
 				totalPrice: Number(item.totalPrice),
@@ -217,7 +252,7 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 					salePrice: Number(item.product.salePrice)
 				}
 			})),
-			orderPayments: order.orderPayments.map(payment => ({
+			orderPayments: orderWithRelations!.orderPayments.map(payment => ({
 				...payment,
 				amount: Number(payment.amount)
 			}))

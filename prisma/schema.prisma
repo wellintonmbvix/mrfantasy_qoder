@@ -134,6 +134,8 @@ model OrderItem {
   discountValue Decimal?     @map("discount_value") @db.Decimal(10, 2)
   totalPrice    Decimal      @map("total_price") @db.Decimal(10, 2)
   itemType      ItemType     @map("item_type")
+  itemTaken     Boolean      @default(false) @map("item_taken")
+  itemReturned  Boolean      @default(false) @map("item_returned")
   createdAt     DateTime     @default(now()) @map("created_at")
 
   // Relations

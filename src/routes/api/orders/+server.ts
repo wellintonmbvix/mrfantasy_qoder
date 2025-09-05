@@ -11,7 +11,9 @@ const OrderItemSchema = z.object({
 	unitPrice: z.number().min(0, 'Preço unitário deve ser positivo'),
 	discountType: z.enum(['PERCENTAGE', 'FIXED']).optional(),
 	discountValue: z.number().min(0, 'Valor do desconto deve ser positivo').optional(),
-	itemType: z.enum(['RENTAL', 'SALE'])
+	itemType: z.enum(['RENTAL', 'SALE']),
+	itemTaken: z.boolean().optional().default(false),
+	itemReturned: z.boolean().optional().default(false)
 }).refine((data) => {
 	// Se há desconto, o tipo deve ser especificado
 	return !data.discountValue || data.discountType;
@@ -354,7 +356,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						discountType: item.discountType || null,
 						discountValue: item.discountValue || null,
 						totalPrice: itemTotalPrice,
-						itemType: item.itemType
+						itemType: item.itemType,
+						itemTaken: item.itemTaken || false,
+						itemReturned: item.itemReturned || false
 					}
 				});
 

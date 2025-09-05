@@ -9,6 +9,8 @@ interface OrderItem {
 	discountValue?: number;
 	totalPrice: number;
 	itemType: 'RENTAL' | 'SALE';
+	itemTaken: boolean;
+	itemReturned: boolean;
 	product?: {
 		id: number;
 		name: string;
@@ -134,6 +136,8 @@ function createOrdersStore() {
 				discountType?: 'PERCENTAGE' | 'FIXED';
 				discountValue?: number;
 				itemType: 'RENTAL' | 'SALE';
+				itemTaken?: boolean;
+				itemReturned?: boolean;
 			}>;
 			payments: Array<{
 				paymentMethodId: number;
