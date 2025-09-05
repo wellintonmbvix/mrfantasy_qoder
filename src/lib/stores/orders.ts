@@ -9,6 +9,8 @@ interface OrderItem {
 	discountValue?: number;
 	totalPrice: number;
 	itemType: 'RENTAL' | 'SALE';
+	// itemTaken: definido automaticamente como true se itemType é 'SALE' 
+	// ou se itemType é 'RENTAL' e rentalStartDate é igual a orderDate
 	itemTaken: boolean;
 	itemReturned: boolean;
 	product?: {
@@ -136,6 +138,7 @@ function createOrdersStore() {
 				discountType?: 'PERCENTAGE' | 'FIXED';
 				discountValue?: number;
 				itemType: 'RENTAL' | 'SALE';
+				// itemTaken: opcional, será automaticamente definido se não informado
 				itemTaken?: boolean;
 				itemReturned?: boolean;
 			}>;

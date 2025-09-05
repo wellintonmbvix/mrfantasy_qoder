@@ -12,6 +12,9 @@ const OrderItemSchema = z.object({
 	discountType: z.enum(['PERCENTAGE', 'FIXED']).optional(),
 	discountValue: z.number().min(0, 'Valor do desconto deve ser positivo').optional(),
 	itemType: z.enum(['RENTAL', 'SALE']),
+	// itemTaken será automaticamente definido como true se:
+	// 1. itemType é 'SALE', OU
+	// 2. itemType é 'RENTAL' E rentalStartDate igual a orderDate
 	itemTaken: z.boolean().optional().default(false),
 	itemReturned: z.boolean().optional().default(false)
 }).refine((data) => {
@@ -347,6 +350,24 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					item.discountValue || 0
 				);
 				
+				// Determine if item should be automatically marked as taken
+				let itemTaken = item.itemTaken || false;
+				
+				// Rule: Auto-set itemTaken to true if:
+				// 1. item_type is 'SALE', OR
+				// 2. item_type is 'RENTAL' AND rental_start_date equals order_date
+				if (item.itemType === 'SALE') {
+					itemTaken = true;
+				} else if (item.itemType === 'RENTAL' && validatedData.rentalStartDate) {
+					// Compare dates (ignore time component)
+					const orderDateOnly = new Date(validatedData.orderDate.getFullYear(), validatedData.orderDate.getMonth(), validatedData.orderDate.getDate());
+					const rentalStartDateOnly = new Date(validatedData.rentalStartDate.getFullYear(), validatedData.rentalStartDate.getMonth(), validatedData.rentalStartDate.getDate());
+					
+					if (orderDateOnly.getTime() === rentalStartDateOnly.getTime()) {
+						itemTaken = true;
+					}
+				}
+				
 				await tx.orderItem.create({
 					data: {
 						orderId: newOrder.id,
@@ -357,7 +378,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						discountValue: item.discountValue || null,
 						totalPrice: itemTotalPrice,
 						itemType: item.itemType,
-						itemTaken: item.itemTaken || false,
+						itemTaken: itemTaken,
 						itemReturned: item.itemReturned || false
 					}
 				});
