@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import { orders } from '$lib/stores/orders.js';
+	import { notify } from '$lib/stores/ui.js';
 	
 	const dispatch = createEventDispatcher();
 	
@@ -9,6 +10,7 @@
 	let orderData: any = null;
 	let loading = true;
 	let error: string | null = null;
+	let updatingItems = new Set<number>();
 	
 	// Load order details when component mounts
 	$: if (orderId) {
@@ -30,6 +32,32 @@
 			error = 'Erro de conexão';
 		} finally {
 			loading = false;
+		}
+	}
+	
+	// Function to update item status
+	async function updateItemStatus(itemId: number, field: 'itemTaken' | 'itemReturned', value: boolean) {
+		updatingItems.add(itemId);
+		updatingItems = updatingItems; // Trigger reactivity
+		
+		try {
+			const orderItems = [{ id: itemId, [field]: value }];
+			const result = await orders.updateOrder(orderId, { orderItems });
+			
+			if (result.success) {
+				notify.success(`Status do item atualizado com sucesso!`);
+				// Update local data
+				orderData.orderItems = orderData.orderItems.map((item: any) => 
+					item.id === itemId ? { ...item, [field]: value } : item
+				);
+			} else {
+				notify.error(result.error || 'Erro ao atualizar status do item');
+			}
+		} catch (err) {
+			notify.error('Erro de conexão');
+		} finally {
+			updatingItems.delete(itemId);
+			updatingItems = updatingItems; // Trigger reactivity
 		}
 	}
 	
@@ -259,6 +287,59 @@
 												<span class="text-gray-600">Total:</span>
 												<span class="font-medium ml-1">R$ {item.totalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
 											</div>
+										</div>
+										<!-- Status do Item -->
+										<div class="mt-3 pt-3 border-t border-gray-200">
+											<div class="flex items-center justify-between mb-2">
+												<span class="text-sm text-gray-600">Status da Retirada:</span>
+												<label class="inline-flex items-center cursor-pointer">
+													<input 
+														type="checkbox" 
+														checked={item.itemTaken}
+														disabled={updatingItems.has(item.id)}
+														on:change={(e) => {
+															const target = e.target as HTMLInputElement;
+															updateItemStatus(item.id, 'itemTaken', target.checked);
+														}}
+														class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+													/>
+													<span class="ml-2 text-sm font-medium {item.itemTaken ? 'text-green-800' : 'text-gray-700'}">
+														{item.itemTaken ? 'Retirado' : 'Não retirado'}
+													</span>
+													{#if updatingItems.has(item.id)}
+														<svg class="animate-spin ml-2 h-4 w-4 text-primary-600" fill="none" viewBox="0 0 24 24">
+															<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+															<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+														</svg>
+													{/if}
+												</label>
+											</div>
+											{#if item.itemType === 'RENTAL'}
+												<div class="flex items-center justify-between">
+													<span class="text-sm text-gray-600">Status da Devolução:</span>
+													<label class="inline-flex items-center cursor-pointer">
+														<input 
+															type="checkbox" 
+															checked={item.itemReturned}
+															disabled={updatingItems.has(item.id)}
+															on:change={(e) => {
+																const target = e.target as HTMLInputElement;
+																updateItemStatus(item.id, 'itemReturned', target.checked);
+															}}
+															class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+														/>
+														<span class="ml-2 text-sm font-medium {item.itemReturned ? 'text-purple-800' : 'text-gray-700'}">
+															{item.itemReturned ? 'Devolvido' : 'Não devolvido'}
+														</span>
+														{#if updatingItems.has(item.id)}
+															<svg class="animate-spin ml-2 h-4 w-4 text-primary-600" fill="none" viewBox="0 0 24 24">
+																<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+																<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 818-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+															</svg>
+														{/if}
+													</label>
+												</div>
+											{/if}
 										</div>
 									</div>
 								{/each}

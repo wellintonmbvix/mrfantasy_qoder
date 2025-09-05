@@ -182,6 +182,11 @@ function createOrdersStore() {
 			rentalEndDate?: Date;
 			returnDate?: Date;
 			notes?: string;
+			orderItems?: Array<{
+				id: number;
+				itemTaken?: boolean;
+				itemReturned?: boolean;
+			}>;
 		}) => {
 			try {
 				const response = await fetch(`/api/orders/${id}`, {

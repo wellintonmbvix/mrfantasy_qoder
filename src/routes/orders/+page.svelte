@@ -130,6 +130,15 @@
 		}
 		return new Date(order.rentalEndDate) < new Date();
 	}
+
+	// Function to get item status summary
+	function getItemStatusSummary(orderItems: any[]) {
+		const taken = orderItems.filter(item => item.itemTaken).length;
+		const returned = orderItems.filter(item => item.itemReturned).length;
+		const total = orderItems.length;
+		
+		return { taken, returned, total };
+	}
 </script>
 
 <svelte:head>
@@ -270,6 +279,9 @@
 								Valor
 							</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+								Itens
+							</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
 								Status
 							</th>
 							<th scope="col" class="relative px-6 py-3">
@@ -324,6 +336,27 @@
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
 									R$ {order.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<div class="text-sm text-gray-900">
+										<div class="flex items-center space-x-2">
+											<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+												✓ {getItemStatusSummary(order.orderItems).taken}/{getItemStatusSummary(order.orderItems).total}
+											</span>
+											{#if order.orderType === 'RENTAL' && getItemStatusSummary(order.orderItems).returned > 0}
+												<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+													↵ {getItemStatusSummary(order.orderItems).returned}/{getItemStatusSummary(order.orderItems).total}
+												</span>
+											{/if}
+										</div>
+										<div class="text-xs text-gray-500 mt-1">
+											{#if order.orderType === 'RENTAL'}
+												Retirado/Devolvido
+											{:else}
+												Retirado
+											{/if}
+										</div>
+									</div>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<select
