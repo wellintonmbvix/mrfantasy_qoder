@@ -2,6 +2,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import { orders } from '$lib/stores/orders.js';
 	import { notify } from '$lib/stores/ui.js';
+	import { user, isManager } from '$lib/stores/auth.js';
 	
 	const dispatch = createEventDispatcher();
 	
@@ -317,13 +318,22 @@
 											{#if item.itemType === 'RENTAL'}
 												<div class="flex items-center justify-between">
 													<span class="text-sm text-gray-600">Status da Devolução:</span>
-													<label class="inline-flex items-center cursor-pointer">
+													<div class="flex flex-col items-end">
+														<label class="inline-flex items-center cursor-pointer">
 														<input 
 															type="checkbox" 
 															checked={item.itemReturned}
 															disabled={updatingItems.has(item.id)}
 															on:change={(e) => {
 																const target = e.target as HTMLInputElement;
+																// Verificar se é tentativa de desmarcar item devolvido por usuário sem permissão
+																if (item.itemReturned === true && target.checked === false && !$isManager) {
+																	// Impedir a alteração visual
+																	target.checked = true;
+																	// Mostrar aviso
+																	notify.error('Somente usuários administrativos ou gerentes podem reverter o status de devolução');
+																	return;
+																}
 																updateItemStatus(item.id, 'itemReturned', target.checked);
 															}}
 															class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
@@ -338,10 +348,22 @@
 															</svg>
 														{/if}
 													</label>
+													<!-- Legenda de aviso para usuários sem permissão -->
+													{#if item.itemReturned && !$isManager}
+														<div class="mt-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 max-w-xs">
+															<div class="flex items-center">
+																<svg class="w-3 h-3 mr-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+																	<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+																</svg>
+																<span class="text-xs">Apenas admin/gerente pode reverter devolução</span>
+															</div>
+														</div>
+													{/if}
 												</div>
-											{/if}
-										</div>
+											</div>
+										{/if}
 									</div>
+								</div>
 								{/each}
 								
 								<!-- Total -->

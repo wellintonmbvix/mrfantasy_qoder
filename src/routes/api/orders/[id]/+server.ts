@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
 import { z } from 'zod';
+import { requireRole } from '$lib/server/middleware.js';
 
 const OrderUpdateSchema = z.object({
 	status: z.enum(['PENDING', 'CONFIRMED', 'DELIVERED', 'RETURNED', 'CANCELLED']).optional(),
@@ -107,6 +108,28 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 
 		if (!currentOrder) {
 			return json({ error: 'Pedido não encontrado' }, { status: 404 });
+		}
+
+		// Validar permissões para alteração de itemReturned de true para false
+		if (validatedData.orderItems) {
+			for (const itemUpdate of validatedData.orderItems) {
+				// Encontrar o item atual no pedido
+				const currentItem = currentOrder.orderItems.find(item => item.id === itemUpdate.id);
+				
+				if (currentItem && itemUpdate.itemReturned !== undefined) {
+					// Se tentando alterar itemReturned de true para false
+					if (currentItem.itemReturned === true && itemUpdate.itemReturned === false) {
+						// Verificar se o usuário tem papel ADMIN ou MANAGER
+						const roleCheck = requireRole(locals, 'MANAGER');
+						if (!roleCheck.success) {
+							return json(
+								{ error: 'Somente usuários com papel administrativo ou gerente podem reverter status de devolução' },
+								{ status: 403 }
+							);
+						}
+					}
+				}
+			}
 		}
 
 		// Handle status changes that affect inventory
