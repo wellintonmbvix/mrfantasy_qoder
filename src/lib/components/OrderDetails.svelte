@@ -89,9 +89,13 @@
 		return labels[status as keyof typeof labels] || status;
 	}
 	
-	function getOrderTypeLabel(type: string) {
-		return type === 'RENTAL' ? 'Aluguel' : 'Venda';
-	}
+		function getOrderTypeLabel() {
+			if (orderData && orderData.orderItems) {
+				const hasRentalItems = orderData.orderItems.some((item: { itemType: string; }) => item.itemType === 'RENTAL');
+				return hasRentalItems ? 'Aluguel' : 'Venda';
+			}
+			return 'Venda';
+		}
 </script>
 
 <svelte:head>
@@ -326,9 +330,12 @@
 								<div class="flex justify-between">
 									<dt class="text-sm text-gray-600">Tipo:</dt>
 									<dd class="text-sm font-medium text-gray-900">
-										<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {orderData.orderType === 'RENTAL' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
-											{getOrderTypeLabel(orderData.orderType)}
-										</span>
+										{#if orderData.orderItems}
+											{@const hasRentalItems = orderData.orderItems.some((item: any) => item.itemType === 'RENTAL')}
+											<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {hasRentalItems ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
+												{getOrderTypeLabel()}
+											</span>
+										{/if}
 									</dd>
 								</div>
 								<div class="flex justify-between">
@@ -343,7 +350,9 @@
 									<dt class="text-sm text-gray-600">Data do Pedido:</dt>
 									<dd class="text-sm font-medium text-gray-900">{new Date(orderData.orderDate).toLocaleDateString('pt-BR')}</dd>
 								</div>
-								{#if orderData.orderType === 'RENTAL'}
+								{#if orderData.orderItems}
+									{@const hasRentalItems = orderData.orderItems.some((item: any) => item.itemType === 'RENTAL')}
+									{#if hasRentalItems}
 									{#if orderData.rentalStartDate}
 										<div class="flex justify-between">
 											<dt class="text-sm text-gray-600">Início do Aluguel:</dt>
@@ -363,6 +372,7 @@
 										</div>
 									{/if}
 								{/if}
+							{/if}
 								<div class="flex justify-between pt-2 border-t">
 									<dt class="text-sm font-medium text-gray-900">Valor Total:</dt>
 									<dd class="text-sm font-bold text-gray-900">

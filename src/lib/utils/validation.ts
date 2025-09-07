@@ -165,9 +165,6 @@ export const orderSchema = z.object({
 	customerId: z.number()
 		.int('ID do cliente inválido')
 		.positive('ID do cliente deve ser positivo'),
-	type: z.enum(['RENTAL', 'SALE'], {
-		errorMap: () => ({ message: 'Tipo de pedido inválido' })
-	}),
 	orderDate: z.string()
 		.refine(date => !isNaN(Date.parse(date)), 'Data inválida'),
 	returnDate: z.string()

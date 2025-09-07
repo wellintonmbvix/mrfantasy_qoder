@@ -116,12 +116,13 @@
 				<div class="flow-root">
 					<ul class="-my-3 divide-y divide-gray-200">
 						{#each recentOrders as order}
+							{@const hasRentalItems = order.orderItems && order.orderItems.some((item: any) => item.itemType === 'RENTAL')}
 							<li class="py-3">
 								<div class="flex items-center space-x-4">
 									<div class="flex-shrink-0">
 										<div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
 											<span class="text-xs font-medium text-primary-600">
-												{order.orderType === 'RENTAL' ? 'A' : 'V'}
+												{hasRentalItems ? 'A' : 'V'}
 											</span>
 										</div>
 									</div>

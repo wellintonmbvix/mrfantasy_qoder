@@ -40,7 +40,6 @@ const OrderPaymentSchema = z.object({
 const OrderSchema = z.object({
 	customerId: z.number().int().positive('ID do cliente deve ser positivo').optional(),
 	attendantId: z.number().int().positive('ID do atendente deve ser positivo'),
-	orderType: z.enum(['RENTAL', 'SALE']),
 	orderDate: z.string().transform((str) => new Date(str)),
 	rentalStartDate: z.string().transform((str) => new Date(str)).optional(),
 	rentalEndDate: z.string().transform((str) => new Date(str)).optional(),
@@ -50,10 +49,10 @@ const OrderSchema = z.object({
 	items: z.array(OrderItemSchema).min(1, 'Pelo menos um item é obrigatório'),
 	payments: z.array(OrderPaymentSchema).min(1, 'Pelo menos um meio de pagamento é obrigatório')
 }).refine((data) => {
-	// Cliente é obrigatório apenas para aluguéis
-	return data.orderType !== 'RENTAL' || data.customerId !== undefined;
+	// Cliente é obrigatório quando há pelo menos um item do tipo aluguel
+	return !data.items.some(item => item.itemType === 'RENTAL') || data.customerId !== undefined;
 }, {
-	message: 'Cliente é obrigatório para pedidos de aluguel',
+	message: 'Cliente é obrigatório quando há itens de aluguel',
 	path: ['customerId']
 }).refine((data) => {
 	// Se há desconto no pedido, o tipo deve ser especificado
@@ -73,7 +72,6 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	try {
 		const search = url.searchParams.get('search') || '';
 		const status = url.searchParams.get('status') || '';
-		const orderType = url.searchParams.get('orderType') || '';
 		const orderDateFrom = url.searchParams.get('orderDateFrom');
 		const rentalStartDateFrom = url.searchParams.get('rentalStartDateFrom');
 		const returnDateFrom = url.searchParams.get('returnDateFrom');
@@ -123,7 +121,6 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 				]
 			}),
 			...(status && { status: status as any }),
-			...(orderType && { orderType: orderType as any }),
 			...(dateFilters.length > 0 && { AND: dateFilters })
 		};
 
@@ -355,7 +352,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Determine order status based on items
 		// If all items are SALE type, mark order as CONFIRMED
+		// If has any RENTAL items, keep as PENDING
 		const allItemsAreSale = processedItems.every(item => item.itemType === 'SALE');
+		const hasRentalItems = processedItems.some(item => item.itemType === 'RENTAL');
+		
 		const orderStatus = allItemsAreSale ? 'CONFIRMED' : 'PENDING';
 
 		// Create order in a transaction
@@ -367,7 +367,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					userId: locals.user!.id,
 					attendantId: validatedData.attendantId,
 					orderNumber,
-					orderType: validatedData.orderType,
 					subtotalAmount,
 					discountType: validatedData.discountType || null,
 					discountValue: validatedData.discountValue || null,
@@ -436,8 +435,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					data: {
 						productId: item.productId,
 						quantityChange: -item.quantity,
-						operationType: validatedData.orderType === 'RENTAL' ? 'RENTAL' : 'SALE',
-						reason: `${validatedData.orderType === 'RENTAL' ? 'Aluguel' : 'Venda'} - Pedido ${orderNumber}`,
+						operationType: hasRentalItems ? 'RENTAL' : 'SALE',
+						reason: `${hasRentalItems ? 'Aluguel' : 'Venda'} - Pedido ${orderNumber}`,
 						userId: locals.user!.id
 					}
 				});

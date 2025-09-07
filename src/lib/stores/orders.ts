@@ -26,7 +26,6 @@ interface Order {
 	userId: number;
 	attendantId?: number;
 	orderNumber: string;
-	orderType: 'RENTAL' | 'SALE';
 	subtotalAmount: number;
 	discountType?: 'PERCENTAGE' | 'FIXED';
 	discountValue?: number;
@@ -82,7 +81,6 @@ function createOrdersStore() {
 		fetchOrders: async (params: { 
 			search?: string; 
 			status?: string;
-			orderType?: string;
 			orderDateFrom?: string;
 			rentalStartDateFrom?: string;
 			returnDateFrom?: string;
@@ -95,7 +93,6 @@ function createOrdersStore() {
 				const searchParams = new URLSearchParams();
 				if (params.search) searchParams.set('search', params.search);
 				if (params.status) searchParams.set('status', params.status);
-				if (params.orderType) searchParams.set('orderType', params.orderType);
 				if (params.orderDateFrom) searchParams.set('orderDateFrom', params.orderDateFrom);
 				if (params.rentalStartDateFrom) searchParams.set('rentalStartDateFrom', params.rentalStartDateFrom);
 				if (params.returnDateFrom) searchParams.set('returnDateFrom', params.returnDateFrom);
@@ -130,7 +127,6 @@ function createOrdersStore() {
 		createOrder: async (orderData: {
 			customerId?: number;
 			attendantId: number;
-			orderType: 'RENTAL' | 'SALE';
 			orderDate: Date;
 			rentalStartDate?: Date;
 			rentalEndDate?: Date;

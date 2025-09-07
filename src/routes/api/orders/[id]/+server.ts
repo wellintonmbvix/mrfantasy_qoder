@@ -161,37 +161,42 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 				});
 			}
 
-			if (validatedData.status === 'RETURNED' && currentOrder.orderType === 'RENTAL') {
-				// Return rental items to stock
-				await prisma.$transaction(async (tx: any) => {
-					for (const item of currentOrder.orderItems) {
-						if (item.itemType === 'RENTAL') {
-							await tx.product.update({
-								where: { id: item.productId },
-								data: {
-									stockQuantity: {
-										increment: item.quantity
+			if (validatedData.status === 'RETURNED') {
+				// Check if order has rental items
+				const hasRentalItems = currentOrder.orderItems.some(item => item.itemType === 'RENTAL');
+				
+				if (hasRentalItems) {
+					// Return rental items to stock
+					await prisma.$transaction(async (tx: any) => {
+						for (const item of currentOrder.orderItems) {
+							if (item.itemType === 'RENTAL') {
+								await tx.product.update({
+									where: { id: item.productId },
+									data: {
+										stockQuantity: {
+											increment: item.quantity
+										}
 									}
-								}
-							});
+								});
 
-							// Create inventory log
-							await tx.inventoryLog.create({
-								data: {
-									productId: item.productId,
-									quantityChange: item.quantity,
-									operationType: 'RETURN',
-									reason: `Devolução do aluguel - Pedido ${currentOrder.orderNumber}`,
-									userId: locals.user!.id
-								}
-							});
+								// Create inventory log
+								await tx.inventoryLog.create({
+									data: {
+										productId: item.productId,
+										quantityChange: item.quantity,
+										operationType: 'RETURN',
+										reason: `Devolução do aluguel - Pedido ${currentOrder.orderNumber}`,
+										userId: locals.user!.id
+									}
+								});
+							}
 						}
-					}
-				});
+					});
 
-				// Set return date if not provided
-				if (!validatedData.returnDate) {
-					validatedData.returnDate = new Date();
+					// Set return date if not provided
+					if (!validatedData.returnDate) {
+						validatedData.returnDate = new Date();
+					}
 				}
 			}
 		}

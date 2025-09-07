@@ -12,7 +12,6 @@
 	
 	let selectedCustomerId = '';
 	let selectedAttendantId = '';
-	let orderType: 'RENTAL' | 'SALE' = 'RENTAL';
 	let orderDate = new Date().toISOString().split('T')[0];
 	let rentalStartDate = '';
 	let rentalEndDate = '';
@@ -64,7 +63,7 @@
 	let totalAmount: number;
 	let totalPayments: number;
 	let paymentBalance: number;
-	let isRental: boolean;
+	let hasRentalItems: boolean;
 	let rentalDays: number;
 	
 	$: {
@@ -93,7 +92,7 @@
 		
 		totalPayments = orderPayments.reduce((sum, payment) => sum + payment.amount, 0);
 		paymentBalance = totalAmount - totalPayments;
-		isRental = orderType === 'RENTAL';
+		hasRentalItems = orderItems.some(item => item.itemType === 'RENTAL');
 		rentalDays = rentalStartDate && rentalEndDate 
 			? Math.ceil((new Date(rentalEndDate).getTime() - new Date(rentalStartDate).getTime()) / (1000 * 60 * 60 * 24))
 			: 0;
@@ -160,9 +159,17 @@
 		if (existingIndex >= 0) {
 			orderItems[existingIndex].quantity += 1;
 		} else {
-			// Se o produto está disponível para ambos (venda e aluguel), usar o tipo padrão do pedido
-			// mas permitir que o usuário altere depois
-			const defaultItemType = orderType;
+			// Se o produto está disponível para ambos (venda e aluguel), usar o tipo aluguel como padrão
+			// Se está disponível apenas para um, usar o tipo disponível
+			let defaultItemType: 'RENTAL' | 'SALE';
+			if (product.availableForRental && product.availableForSale) {
+				defaultItemType = 'RENTAL'; // Default para aluguel
+			} else if (product.availableForRental) {
+				defaultItemType = 'RENTAL';
+			} else {
+				defaultItemType = 'SALE';
+			}
+			
 			const defaultPrice = defaultItemType === 'RENTAL' ? product.rentalPrice : product.salePrice;
 			
 			orderItems = [...orderItems, {
@@ -300,16 +307,16 @@
 			errors.attendant = 'Atendente é obrigatório';
 		}
 		
-		// Cliente é obrigatório apenas para aluguéis
-		if (isRental && !selectedCustomerId) {
-			errors.customer = 'Cliente é obrigatório para aluguéis';
+		// Cliente é obrigatório quando há pelo menos um item do tipo aluguel
+		if (hasRentalItems && !selectedCustomerId) {
+			errors.customer = 'Cliente é obrigatório quando há itens de aluguel';
 		}
 		
 		if (!orderDate) {
 			errors.orderDate = 'Data do pedido é obrigatória';
 		}
 		
-		if (isRental) {
+		if (hasRentalItems) {
 			if (!rentalStartDate) {
 				errors.rentalStartDate = 'Data de início é obrigatória para aluguéis';
 			}
@@ -375,7 +382,6 @@
 		const orderData = {
 			...(selectedCustomerId && { customerId: parseInt(selectedCustomerId) }),
 			attendantId: parseInt(selectedAttendantId),
-			orderType,
 			orderDate: new Date(orderDate),
 			rentalStartDate: rentalStartDate ? new Date(rentalStartDate) : undefined,
 			rentalEndDate: rentalEndDate ? new Date(rentalEndDate) : undefined,
@@ -768,35 +774,9 @@
 			{:else if activeTab === 'order'}
 				<!-- Order Information Tab -->
 				<div class="space-y-6">
-					<!-- Order Type -->
-					<div>
-						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label class="form-label">Tipo de pedido *</label>
-						<div class="flex space-x-4">
-							<label class="flex items-center">
-								<input
-									type="radio"
-									bind:group={orderType}
-									value="RENTAL"
-									class="mr-2 text-primary-600 focus:ring-primary-500"
-								/>
-								Aluguel
-							</label>
-							<label class="flex items-center">
-								<input
-									type="radio"
-									bind:group={orderType}
-									value="SALE"
-									class="mr-2 text-primary-600 focus:ring-primary-500"
-								/>
-								Venda
-							</label>
-						</div>
-					</div>
-					
 					<!-- Customer Search -->
 					<div class="relative">
-						<label for="customer" class="form-label">Cliente {isRental ? '*' : ''}</label>
+						<label for="customer" class="form-label">Cliente {hasRentalItems ? '*' : ''}</label>
 						<input
 							type="text"
 							bind:value={customerSearch}
@@ -804,7 +784,7 @@
 							on:focus={() => showCustomerDropdown = true}
 							class="form-input {errors.customer ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
 							placeholder="Buscar cliente por nome ou email..."
-							required={isRental}
+							required={hasRentalItems}
 						/>
 						{#if showCustomerDropdown && customersList.length > 0}
 							<div class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
@@ -861,7 +841,7 @@
 						{/if}
 					</div>
 					
-					{#if isRental}
+					{#if hasRentalItems}
 						<!-- Rental Dates -->
 						<div class="grid grid-cols-2 gap-4">
 							<div>

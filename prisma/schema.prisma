@@ -100,7 +100,6 @@ model Order {
   userId          Int         @map("user_id")
   attendantId     Int?        @map("attendant_id")
   orderNumber     String      @unique @map("order_number")
-  orderType       OrderType   @map("order_type")
   subtotalAmount  Decimal     @map("subtotal_amount") @db.Decimal(10, 2)
   discountType    DiscountType? @map("discount_type")
   discountValue   Decimal?    @map("discount_value") @db.Decimal(10, 2)
@@ -261,11 +260,6 @@ enum UserRole {
 enum ProductType {
   FANTASY
   ACCESSORY
-}
-
-enum OrderType {
-  RENTAL
-  SALE
 }
 
 enum OrderStatus {

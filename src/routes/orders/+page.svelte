@@ -7,7 +7,6 @@
 
 	let search = '';
 	let selectedStatus = '';
-	let selectedOrderType = '';
 	let orderDateFrom = '';
 	let rentalStartDateFrom = '';
 	let returnDateFrom = '';
@@ -31,7 +30,6 @@
 		await orders.fetchOrders({
 			search: search.trim(),
 			status: selectedStatus || undefined,
-			orderType: selectedOrderType || undefined,
 			orderDateFrom: orderDateFrom || undefined,
 			rentalStartDateFrom: rentalStartDateFrom || undefined,
 			returnDateFrom: returnDateFrom || undefined,
@@ -48,7 +46,6 @@
 	function resetFilters() {
 		search = '';
 		selectedStatus = '';
-		selectedOrderType = '';
 		orderDateFrom = '';
 		rentalStartDateFrom = '';
 		returnDateFrom = '';
@@ -124,8 +121,9 @@
 		}
 	}
 
-	function getOrderTypeLabel(type: string) {
-		return type === 'RENTAL' ? 'Aluguel' : 'Venda';
+	function getOrderTypeLabel(orderItems: any[]) {
+		const hasRentalItems = orderItems && orderItems.some(item => item.itemType === 'RENTAL');
+		return hasRentalItems ? 'Aluguel' : 'Venda';
 	}
 
 	function viewOrderDetails(orderId: number) {
@@ -134,7 +132,8 @@
 	}
 
 	function isRentalOverdue(order: any) {
-		if (order.orderType !== 'RENTAL' || order.status !== 'DELIVERED' || !order.rentalEndDate) {
+		const hasRentalItems = order.orderItems && order.orderItems.some((item: any) => item.itemType === 'RENTAL');
+		if (!hasRentalItems || order.status !== 'DELIVERED' || !order.rentalEndDate) {
 			return false;
 		}
 		return new Date(order.rentalEndDate) < new Date();
@@ -193,6 +192,15 @@
 			</div>
 		</div>
 		<div>
+			<input
+				type="text"
+				placeholder="Buscar por número, cliente..."
+				bind:value={search}
+				on:input={handleSearch}
+				class="form-input"
+			/>
+		</div>
+		<div>
 			<select bind:value={selectedStatus} class="form-input">
 				<option value="">Todos os status</option>
 				<option value="PENDING">Pendente</option>
@@ -200,13 +208,6 @@
 				<option value="DELIVERED">Entregue</option>
 				<option value="RETURNED">Devolvido</option>
 				<option value="CANCELLED">Cancelado</option>
-			</select>
-		</div>
-		<div>
-			<select bind:value={selectedOrderType} class="form-input">
-				<option value="">Todos os tipos</option>
-				<option value="RENTAL">Aluguel</option>
-				<option value="SALE">Venda</option>
 			</select>
 		</div>
 	</div>
@@ -322,9 +323,6 @@
 								Atendente
 							</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-								Tipo
-							</th>
-							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
 								Data
 							</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -373,14 +371,9 @@
 										<span class="text-sm text-gray-400">Não definido</span>
 									{/if}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap">
-									<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {order.orderType === 'RENTAL' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
-										{getOrderTypeLabel(order.orderType)}
-									</span>
-								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 									<div>{new Date(order.orderDate).toLocaleDateString('pt-BR')}</div>
-									{#if order.orderType === 'RENTAL' && order.rentalStartDate && order.rentalEndDate}
+									{#if order.orderItems && order.orderItems.some((item: any) => item.itemType === 'RENTAL') && order.rentalStartDate && order.rentalEndDate}
 										<div class="text-xs text-gray-500">
 											{new Date(order.rentalStartDate).toLocaleDateString('pt-BR')} - {new Date(order.rentalEndDate).toLocaleDateString('pt-BR')}
 										</div>
@@ -392,17 +385,17 @@
 								<td class="px-6 py-4 whitespace-nowrap">
 									<div class="text-sm text-gray-900">
 										<div class="flex items-center space-x-2">
-											<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-												✓ {getItemStatusSummary(order.orderItems).taken}/{getItemStatusSummary(order.orderItems).total}
-											</span>
-											{#if order.orderType === 'RENTAL' && getItemStatusSummary(order.orderItems).returned > 0}
-												<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-													↵ {getItemStatusSummary(order.orderItems).returned}/{getItemStatusSummary(order.orderItems).total}
+												<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+													✓ {getItemStatusSummary(order.orderItems).taken}/{getItemStatusSummary(order.orderItems).total}
 												</span>
-											{/if}
+												{#if order.orderItems && order.orderItems.some((item: any) => item.itemType === 'RENTAL') && getItemStatusSummary(order.orderItems).returned > 0}
+													<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+														↵ {getItemStatusSummary(order.orderItems).returned}/{getItemStatusSummary(order.orderItems).total}
+													</span>
+												{/if}
 										</div>
 										<div class="text-xs text-gray-500 mt-1">
-											{#if order.orderType === 'RENTAL'}
+											{#if order.orderItems && order.orderItems.some((item: any) => item.itemType === 'RENTAL')}
 												Retirado/Devolvido
 											{:else}
 												Retirado
@@ -424,7 +417,7 @@
 										<option value="PENDING">Pendente</option>
 										<option value="CONFIRMED">Confirmado</option>
 										<option value="DELIVERED">Entregue</option>
-										{#if order.orderType === 'RENTAL'}
+										{#if order.orderItems && order.orderItems.some((item: any) => item.itemType === 'RENTAL')}
 											<option value="RETURNED">Devolvido</option>
 										{/if}
 										<option value="CANCELLED">Cancelado</option>
@@ -438,7 +431,7 @@
 										aria-label="Ver detalhes do pedido"
 									>
 										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 616 0z" />
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
 										</svg>
 									</button>
