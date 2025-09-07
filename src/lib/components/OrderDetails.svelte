@@ -12,6 +12,7 @@
 	let loading = true;
 	let error: string | null = null;
 	let updatingItems = new Set<number>();
+	let activeTab = 'items'; // 'items' or 'details'
 	
 	// Load order details when component mounts
 	$: if (orderId) {
@@ -167,8 +168,153 @@
 					</button>
 				</div>
 			{:else if orderData}
-				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<!-- Left Column - Order Info -->
+				<!-- Tab Navigation -->
+				<div class="border-b border-gray-200 mb-6">
+					<nav class="-mb-px flex space-x-8" aria-label="Tabs">
+						<button
+							type="button"
+							on:click={() => activeTab = 'items'}
+							class="{activeTab === 'items' 
+								? 'border-primary-500 text-primary-600' 
+								: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+							} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+						>
+							<div class="flex items-center">
+								<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+								</svg>
+								Itens do Pedido
+							</div>
+						</button>
+						<button
+							type="button"
+							on:click={() => activeTab = 'details'}
+							class="{activeTab === 'details' 
+								? 'border-primary-500 text-primary-600' 
+								: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+							} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
+						>
+							<div class="flex items-center">
+								<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+								</svg>
+								Detalhes e Pagamentos
+							</div>
+						</button>
+					</nav>
+				</div>
+				<!-- Tab Content -->
+				{#if activeTab === 'items'}
+					<!-- Items Tab - Full Width for Items -->
+					<div class="space-y-4">
+						{#each orderData.orderItems as item}
+							<div class="bg-white rounded-lg p-6 border shadow-sm">
+								<!-- Item Header -->
+								<div class="flex justify-between items-start mb-4">
+									<div class="flex-1">
+										<div class="font-semibold text-xl text-gray-900">{item.product?.name}</div>
+										<div class="text-sm text-gray-500 mt-1">
+											<span class="font-medium">SKU:</span> {item.product?.sku}
+											{#if item.product?.group}
+												• <span class="font-medium">Grupo:</span> {item.product.group.name}
+											{/if}
+										</div>
+									</div>
+									<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {item.itemType === 'RENTAL' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
+										{item.itemType === 'RENTAL' ? 'Aluguel' : 'Venda'}
+									</span>
+								</div>
+								
+								<!-- Item Details Grid -->
+								<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 bg-gray-50 rounded-lg p-4">
+									<div class="text-center">
+										<div class="text-sm text-gray-600 mb-1">Quantidade</div>
+										<div class="text-2xl font-bold text-gray-900">{item.quantity}</div>
+									</div>
+									<div class="text-center">
+										<div class="text-sm text-gray-600 mb-1">Preço Unitário</div>
+										<div class="text-2xl font-bold text-gray-900">R$ {item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+									</div>
+									{#if item.discountValue && item.discountValue > 0}
+										<div class="text-center">
+											<div class="text-sm text-gray-600 mb-1">Desconto</div>
+											<div class="text-2xl font-bold text-orange-600">
+												{item.discountType === 'PERCENTAGE' ? `${item.discountValue}%` : `R$ ${item.discountValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+											</div>
+										</div>
+									{/if}
+									<div class="text-center">
+										<div class="text-sm text-gray-600 mb-1">Total</div>
+										<div class="text-3xl font-bold text-primary-600">R$ {item.totalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+									</div>
+								</div>
+								
+								<!-- Item Status Controls -->
+								<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+									<div class="bg-gray-50 rounded-lg p-4">
+										<div class="flex items-center justify-between">
+											<span class="text-sm font-medium text-gray-700">Status da Retirada</span>
+											<label class="inline-flex items-center cursor-pointer">
+												<input type="checkbox" checked={item.itemTaken} disabled={updatingItems.has(item.id)}
+													on:change={(e) => {
+														const target = e.target as HTMLInputElement;
+														if (target) {
+															updateItemStatus(item.id, 'itemTaken', target.checked);
+														}
+													}}
+													class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-5 w-5"/>
+												<span class="ml-3 text-lg font-medium {item.itemTaken ? 'text-green-800' : 'text-gray-700'}">
+													{item.itemTaken ? 'Retirado' : 'Não retirado'}
+												</span>
+											</label>
+										</div>
+									</div>
+									{#if item.itemType === 'RENTAL'}
+										<div class="bg-gray-50 rounded-lg p-4">
+											<div class="flex items-center justify-between">
+												<span class="text-sm font-medium text-gray-700">Status da Devolução</span>
+												<div class="flex flex-col items-end">
+													<label class="inline-flex items-center cursor-pointer">
+														<input type="checkbox" checked={item.itemReturned} disabled={updatingItems.has(item.id)}
+															on:change={(e) => {
+																const target = e.target as HTMLInputElement;
+																if (!target) return;
+																if (item.itemReturned === true && target.checked === false && !$isManager) {
+																	target.checked = true;
+																	notify.error('Somente usuários administrativos ou gerentes podem reverter o status de devolução');
+																	return;
+																}
+																updateItemStatus(item.id, 'itemReturned', target.checked);
+															}}
+															class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-5 w-5"/>
+														<span class="ml-3 text-lg font-medium {item.itemReturned ? 'text-purple-800' : 'text-gray-700'}">
+															{item.itemReturned ? 'Devolvido' : 'Não devolvido'}
+														</span>
+													</label>
+													{#if item.itemReturned && !$isManager}
+														<div class="mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+															<span>Apenas admin/gerente pode reverter devolução</span>
+														</div>
+													{/if}
+												</div>
+											</div>
+										</div>
+									{/if}
+								</div>
+							</div>
+						{/each}
+						
+						<!-- Total do Pedido -->
+						<div class="bg-white rounded-lg p-6 border border-primary-200 shadow-sm">
+							<div class="flex justify-between items-center">
+								<span class="text-xl font-semibold text-gray-900">Total do Pedido:</span>
+								<span class="text-3xl font-bold text-primary-600">R$ {orderData.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+							</div>
+						</div>
+					</div>
+				{:else}
+					<!-- Details Tab - Order Info, Customer Info, and Payments -->
+					<div class="space-y-6">
 					<div class="space-y-6">
 						<div class="bg-gray-50 rounded-lg p-4">
 							<h4 class="text-sm font-medium text-gray-900 mb-3">Informações do Pedido</h4>
@@ -252,130 +398,7 @@
 								<p class="text-sm text-gray-700">{orderData.notes}</p>
 							</div>
 						{/if}
-					</div>
-					
-					<!-- Right Column - Order Items -->
-					<div class="space-y-6">
-						<div class="bg-gray-50 rounded-lg p-4">
-							<h4 class="text-sm font-medium text-gray-900 mb-3">Itens do Pedido</h4>
-							<div class="space-y-3">
-								{#each orderData.orderItems as item}
-									<div class="bg-white rounded-lg p-3 border">
-										<div class="flex justify-between items-start mb-2">
-											<div class="flex-1">
-												<div class="font-medium text-sm text-gray-900">{item.product?.name}</div>
-												<div class="text-xs text-gray-500">SKU: {item.product?.sku}</div>
-												{#if item.product?.group}
-													<div class="text-xs text-gray-500">Grupo: {item.product.group.name}</div>
-												{/if}
-											</div>
-											<div class="text-right">
-												<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {item.itemType === 'RENTAL' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
-													{item.itemType === 'RENTAL' ? 'Aluguel' : 'Venda'}
-												</span>
-											</div>
-										</div>
-										<div class="grid grid-cols-3 gap-4 text-sm">
-											<div>
-												<span class="text-gray-600">Qtd:</span>
-												<span class="font-medium ml-1">{item.quantity}</span>
-											</div>
-											<div>
-												<span class="text-gray-600">Preço Unit.:</span>
-												<span class="font-medium ml-1">R$ {item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-											</div>
-											<div>
-												<span class="text-gray-600">Total:</span>
-												<span class="font-medium ml-1">R$ {item.totalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-											</div>
-										</div>
-										<!-- Status do Item -->
-										<div class="mt-3 pt-3 border-t border-gray-200">
-											<div class="flex items-center justify-between mb-2">
-												<span class="text-sm text-gray-600">Status da Retirada:</span>
-												<label class="inline-flex items-center cursor-pointer">
-													<input 
-														type="checkbox" 
-														checked={item.itemTaken}
-														disabled={updatingItems.has(item.id)}
-														on:change={(e) => {
-															const target = e.target as HTMLInputElement;
-															updateItemStatus(item.id, 'itemTaken', target.checked);
-														}}
-														class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-													/>
-													<span class="ml-2 text-sm font-medium {item.itemTaken ? 'text-green-800' : 'text-gray-700'}">
-														{item.itemTaken ? 'Retirado' : 'Não retirado'}
-													</span>
-													{#if updatingItems.has(item.id)}
-														<svg class="animate-spin ml-2 h-4 w-4 text-primary-600" fill="none" viewBox="0 0 24 24">
-															<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-															<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-														</svg>
-													{/if}
-												</label>
-											</div>
-											{#if item.itemType === 'RENTAL'}
-												<div class="flex items-center justify-between">
-													<span class="text-sm text-gray-600">Status da Devolução:</span>
-													<div class="flex flex-col items-end">
-														<label class="inline-flex items-center cursor-pointer">
-														<input 
-															type="checkbox" 
-															checked={item.itemReturned}
-															disabled={updatingItems.has(item.id)}
-															on:change={(e) => {
-																const target = e.target as HTMLInputElement;
-																// Verificar se é tentativa de desmarcar item devolvido por usuário sem permissão
-																if (item.itemReturned === true && target.checked === false && !$isManager) {
-																	// Impedir a alteração visual
-																	target.checked = true;
-																	// Mostrar aviso
-																	notify.error('Somente usuários administrativos ou gerentes podem reverter o status de devolução');
-																	return;
-																}
-																updateItemStatus(item.id, 'itemReturned', target.checked);
-															}}
-															class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-														/>
-														<span class="ml-2 text-sm font-medium {item.itemReturned ? 'text-purple-800' : 'text-gray-700'}">
-															{item.itemReturned ? 'Devolvido' : 'Não devolvido'}
-														</span>
-														{#if updatingItems.has(item.id)}
-															<svg class="animate-spin ml-2 h-4 w-4 text-primary-600" fill="none" viewBox="0 0 24 24">
-																<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-																<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 818-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-															</svg>
-														{/if}
-													</label>
-													<!-- Legenda de aviso para usuários sem permissão -->
-													{#if item.itemReturned && !$isManager}
-														<div class="mt-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 max-w-xs">
-															<div class="flex items-center">
-																<svg class="w-3 h-3 mr-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-																	<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-																</svg>
-																<span class="text-xs">Apenas admin/gerente pode reverter devolução</span>
-															</div>
-														</div>
-													{/if}
-												</div>
-											</div>
-										{/if}
-									</div>
-								</div>
-								{/each}
-								
-								<!-- Total -->
-								<div class="border-t pt-3">
-									<div class="flex justify-between items-center font-semibold">
-										<span>Total do Pedido:</span>
-										<span class="text-lg">R$ {orderData.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-									</div>
-								</div>
-							</div>
-						</div>
-						
+
 						<!-- Payment Methods -->
 						{#if orderData.orderPayments && orderData.orderPayments.length > 0}
 							<div class="bg-gray-50 rounded-lg p-4">
@@ -430,8 +453,9 @@
 								</div>
 							</div>
 						{/if}
+						</div>
 					</div>
-				</div>
+				{/if}
 			{/if}
 		</div>
 		
