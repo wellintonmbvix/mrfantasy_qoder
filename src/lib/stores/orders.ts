@@ -83,6 +83,9 @@ function createOrdersStore() {
 			search?: string; 
 			status?: string;
 			orderType?: string;
+			orderDateFrom?: string;
+			rentalStartDateFrom?: string;
+			returnDateFrom?: string;
 			page?: number; 
 			limit?: number;
 		} = {}) => {
@@ -93,6 +96,9 @@ function createOrdersStore() {
 				if (params.search) searchParams.set('search', params.search);
 				if (params.status) searchParams.set('status', params.status);
 				if (params.orderType) searchParams.set('orderType', params.orderType);
+				if (params.orderDateFrom) searchParams.set('orderDateFrom', params.orderDateFrom);
+				if (params.rentalStartDateFrom) searchParams.set('rentalStartDateFrom', params.rentalStartDateFrom);
+				if (params.returnDateFrom) searchParams.set('returnDateFrom', params.returnDateFrom);
 				if (params.page) searchParams.set('page', params.page.toString());
 				if (params.limit) searchParams.set('limit', params.limit.toString());
 

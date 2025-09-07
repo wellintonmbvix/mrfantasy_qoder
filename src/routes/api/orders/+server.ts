@@ -74,9 +74,45 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		const search = url.searchParams.get('search') || '';
 		const status = url.searchParams.get('status') || '';
 		const orderType = url.searchParams.get('orderType') || '';
+		const orderDateFrom = url.searchParams.get('orderDateFrom');
+		const rentalStartDateFrom = url.searchParams.get('rentalStartDateFrom');
+		const returnDateFrom = url.searchParams.get('returnDateFrom');
 		const page = parseInt(url.searchParams.get('page') || '1');
 		const limit = parseInt(url.searchParams.get('limit') || '10');
 		const skip = (page - 1) * limit;
+
+		// Build date filters
+		const dateFilters = [];
+		if (orderDateFrom) {
+			try {
+				const fromDate = new Date(orderDateFrom);
+				if (!isNaN(fromDate.getTime())) {
+					dateFilters.push({ orderDate: { gte: fromDate } });
+				}
+			} catch (e) {
+				// Invalid date, ignore
+			}
+		}
+		if (rentalStartDateFrom) {
+			try {
+				const fromDate = new Date(rentalStartDateFrom);
+				if (!isNaN(fromDate.getTime())) {
+					dateFilters.push({ rentalStartDate: { gte: fromDate } });
+				}
+			} catch (e) {
+				// Invalid date, ignore
+			}
+		}
+		if (returnDateFrom) {
+			try {
+				const fromDate = new Date(returnDateFrom);
+				if (!isNaN(fromDate.getTime())) {
+					dateFilters.push({ returnDate: { gte: fromDate } });
+				}
+			} catch (e) {
+				// Invalid date, ignore
+			}
+		}
 
 		const where = {
 			...(search && {
@@ -87,7 +123,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 				]
 			}),
 			...(status && { status: status as any }),
-			...(orderType && { orderType: orderType as any })
+			...(orderType && { orderType: orderType as any }),
+			...(dateFilters.length > 0 && { AND: dateFilters })
 		};
 
 		const [orders, total] = await Promise.all([
@@ -172,6 +209,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			}
 		});
 	} catch (error) {
+		console.error('Erro ao buscar pedidos:', error);
 		return json({ error: 'Erro ao buscar pedidos' }, { status: 500 });
 	}
 };

@@ -8,6 +8,9 @@
 	let search = '';
 	let selectedStatus = '';
 	let selectedOrderType = '';
+	let orderDateFrom = '';
+	let rentalStartDateFrom = '';
+	let returnDateFrom = '';
 	let currentPage = 1;
 	const itemsPerPage = 10;
 	
@@ -29,6 +32,9 @@
 			search: search.trim(),
 			status: selectedStatus || undefined,
 			orderType: selectedOrderType || undefined,
+			orderDateFrom: orderDateFrom || undefined,
+			rentalStartDateFrom: rentalStartDateFrom || undefined,
+			returnDateFrom: returnDateFrom || undefined,
 			page: currentPage,
 			limit: itemsPerPage
 		});
@@ -43,6 +49,9 @@
 		search = '';
 		selectedStatus = '';
 		selectedOrderType = '';
+		orderDateFrom = '';
+		rentalStartDateFrom = '';
+		returnDateFrom = '';
 		currentPage = 1;
 		loadOrders();
 	}
@@ -199,6 +208,49 @@
 				<option value="RENTAL">Aluguel</option>
 				<option value="SALE">Venda</option>
 			</select>
+		</div>
+	</div>
+
+	<!-- Date Filters -->
+	<div class="bg-gray-50 p-4 rounded-lg">
+		<h3 class="text-sm font-medium text-gray-700 mb-3">Filtros por Data</h3>
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div>
+				<label for="orderDateFrom" class="block text-xs font-medium text-gray-700 mb-1">
+					Data do Pedido (a partir de)
+				</label>
+				<input
+					id="orderDateFrom"
+					type="date"
+					bind:value={orderDateFrom}
+					on:change={handleSearch}
+					class="form-input text-sm"
+				/>
+			</div>
+			<div>
+				<label for="rentalStartDateFrom" class="block text-xs font-medium text-gray-700 mb-1">
+					Data de Início do Aluguel (a partir de)
+				</label>
+				<input
+					id="rentalStartDateFrom"
+					type="date"
+					bind:value={rentalStartDateFrom}
+					on:change={handleSearch}
+					class="form-input text-sm"
+				/>
+			</div>
+			<div>
+				<label for="returnDateFrom" class="block text-xs font-medium text-gray-700 mb-1">
+					Data de Devolução (a partir de)
+				</label>
+				<input
+					id="returnDateFrom"
+					type="date"
+					bind:value={returnDateFrom}
+					on:change={handleSearch}
+					class="form-input text-sm"
+				/>
+			</div>
 		</div>
 	</div>
 
