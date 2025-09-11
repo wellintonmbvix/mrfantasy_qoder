@@ -132,8 +132,39 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 			}
 		}
 
+		// Helper function to check if all rental items have itemTaken = true
+		const checkAllRentalItemsTaken = (orderItems: any[]) => {
+			const rentalItems = orderItems.filter(item => item.itemType === 'RENTAL');
+			if (rentalItems.length === 0) return false; // No rental items
+			return rentalItems.every(item => item.itemTaken === true);
+		};
+
+		// Helper function to update itemTaken for all rental items
+		const updateRentalItemsTaken = async (tx: any, orderId: number, itemTaken: boolean) => {
+			const rentalItems = await tx.orderItem.findMany({
+				where: {
+					orderId: orderId,
+					itemType: 'RENTAL'
+				}
+			});
+
+			for (const item of rentalItems) {
+				await tx.orderItem.update({
+					where: { id: item.id },
+					data: { itemTaken }
+				});
+			}
+		};
+
 		// Handle status changes that affect inventory
 		if (validatedData.status && validatedData.status !== currentOrder.status) {
+			if (validatedData.status === 'DELIVERED') {
+				// When order status changes to DELIVERED, mark all rental items as taken
+				await prisma.$transaction(async (tx: any) => {
+					await updateRentalItemsTaken(tx, orderId, true);
+				});
+			}
+
 			if (validatedData.status === 'CANCELLED' && currentOrder.status !== 'CANCELLED') {
 				// Return items to stock
 				await prisma.$transaction(async (tx: any) => {
@@ -224,6 +255,19 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 							itemTaken: itemUpdate.itemTaken,
 							itemReturned: itemUpdate.itemReturned
 						}
+					});
+				}
+
+				// Check if all rental items are now taken and order is not DELIVERED yet
+				const updatedOrderItems = await tx.orderItem.findMany({
+					where: { orderId: orderId }
+				});
+
+				if (updatedOrder.status !== 'DELIVERED' && checkAllRentalItemsTaken(updatedOrderItems)) {
+					// Auto-update status to DELIVERED if all rental items are taken
+					await tx.order.update({
+						where: { id: orderId },
+						data: { status: 'DELIVERED' }
 					});
 				}
 			}
