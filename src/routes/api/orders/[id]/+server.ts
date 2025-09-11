@@ -110,6 +110,17 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 			return json({ error: 'Pedido não encontrado' }, { status: 404 });
 		}
 
+		// Validar permissões para alteração de status para CANCELLED
+		if (validatedData.status === 'CANCELLED' && currentOrder.status !== 'CANCELLED') {
+			const roleCheck = requireRole(locals, 'MANAGER');
+			if (!roleCheck.success) {
+				return json(
+					{ error: 'Somente usuários com papel administrativo ou gerente podem cancelar pedidos' },
+					{ status: 403 }
+				);
+			}
+		}
+
 		// Validar permissões para alteração de itemReturned de true para false
 		if (validatedData.orderItems) {
 			for (const itemUpdate of validatedData.orderItems) {

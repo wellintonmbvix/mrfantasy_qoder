@@ -16,11 +16,18 @@ function createNotificationStore() {
 			const id = Math.random().toString(36).substr(2, 9);
 			const newNotification = { ...notification, id };
 			
-			update(notifications => [...notifications, newNotification]);
+			console.log('🔔 Adicionando notificação:', newNotification);
+			update(notifications => {
+				console.log('📝 Notificações antes:', notifications);
+				const updatedNotifications = [...notifications, newNotification];
+				console.log('📝 Notificações depois:', updatedNotifications);
+				return updatedNotifications;
+			});
 
 			// Auto-remove after duration (default: 5 seconds)
 			if (notification.duration !== 0) {
 				setTimeout(() => {
+					console.log('🗑️ Removendo notificação:', id);
 					update(notifications => notifications.filter(n => n.id !== id));
 				}, notification.duration || 5000);
 			}

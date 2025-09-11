@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { customers } from '$lib/stores/customers.js';
-	import { ui, notify } from '$lib/stores/ui.js';
+	import { ui } from '$lib/stores/ui.js';
+	import { notificationStore } from '$lib/stores/notifications.js';
 	import CustomerForm from '$lib/components/CustomerForm.svelte';
 	import DeleteConfirmModal from '$lib/components/DeleteConfirmModal.svelte';
 
@@ -63,11 +64,11 @@
 		}
 
 		if (result.success) {
-			notify.success(isEdit ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!');
+			notificationStore.success(isEdit ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!');
 			ui.closeModal('customerForm');
 			loadCustomers();
 		} else {
-			notify.error(result.error || 'Erro ao salvar cliente');
+			notificationStore.error(result.error || 'Erro ao salvar cliente');
 		}
 	}
 
@@ -76,11 +77,11 @@
 			const result = await customers.delete(deleteCustomerId);
 			
 			if (result.success) {
-				notify.success('Cliente removido com sucesso!');
+				notificationStore.success('Cliente removido com sucesso!');
 				ui.closeModal('deleteConfirm');
 				loadCustomers();
 			} else {
-				notify.error(result.error || 'Erro ao remover cliente');
+				notificationStore.error(result.error || 'Erro ao remover cliente');
 			}
 		}
 		deleteCustomerId = null;

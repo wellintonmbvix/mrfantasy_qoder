@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { products } from '$lib/stores/products.js';
-	import { ui, notify } from '$lib/stores/ui.js';
+	import { ui } from '$lib/stores/ui.js';
+	import { notificationStore } from '$lib/stores/notifications.js';
 	import ProductForm from '$lib/components/ProductForm.svelte';
 	import GroupForm from '$lib/components/GroupForm.svelte';
 	import DeleteConfirmModal from '$lib/components/DeleteConfirmModal.svelte';
@@ -87,11 +88,11 @@
 		}
 
 		if (result.success) {
-			notify.success(isEdit ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!');
+			notificationStore.success(isEdit ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!');
 			ui.closeModal('productForm');
 			loadProducts();
 		} else {
-			notify.error(result.error || 'Erro ao salvar produto');
+			notificationStore.error(result.error || 'Erro ao salvar produto');
 		}
 	}
 
@@ -100,11 +101,11 @@
 			const result = await products.deleteProduct(deleteProductId);
 			
 			if (result.success) {
-				notify.success('Produto removido com sucesso!');
+				notificationStore.success('Produto removido com sucesso!');
 				ui.closeModal('deleteConfirm');
 				loadProducts();
 			} else {
-				notify.error(result.error || 'Erro ao remover produto');
+				notificationStore.error(result.error || 'Erro ao remover produto');
 			}
 		}
 		deleteProductId = null;
@@ -137,11 +138,11 @@
 		}
 
 		if (result.success) {
-			notify.success(isEdit ? 'Grupo atualizado com sucesso!' : 'Grupo criado com sucesso!');
+			notificationStore.success(isEdit ? 'Grupo atualizado com sucesso!' : 'Grupo criado com sucesso!');
 			ui.closeModal('groupForm');
 			products.fetchGroups();
 		} else {
-			notify.error(result.error || 'Erro ao salvar grupo');
+			notificationStore.error(result.error || 'Erro ao salvar grupo');
 		}
 	}
 
@@ -150,11 +151,11 @@
 			const result = await products.deleteGroup(deleteGroupId);
 			
 			if (result.success) {
-				notify.success('Grupo removido com sucesso!');
+				notificationStore.success('Grupo removido com sucesso!');
 				ui.closeModal('deleteConfirm');
 				products.fetchGroups();
 			} else {
-				notify.error(result.error || 'Erro ao remover grupo');
+				notificationStore.error(result.error || 'Erro ao remover grupo');
 			}
 		}
 		deleteGroupId = null;

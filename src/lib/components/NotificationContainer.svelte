@@ -2,7 +2,12 @@
 	import { notificationStore } from '$lib/stores/notifications.js';
 	import { fade } from 'svelte/transition';
 
-	$: notifications = $notificationStore || [];
+	let notifications: any[] = [];
+
+	$: {
+		notifications = $notificationStore || [];
+		console.log('📄 NotificationContainer - Notificações atuais:', notifications);
+	}
 
 	function closeNotification(id: string) {
 		notificationStore.remove(id);
@@ -54,14 +59,16 @@
 <!-- Notification Container -->
 {#if notifications.length > 0}
 	<div 
-		class="fixed top-4 right-4 z-50 space-y-2 w-96"
+		class="fixed top-4 right-4 z-[9999] space-y-2 w-96"
 		role="alert"
 		aria-live="polite"
+		style="z-index: 9999; pointer-events: none;"
 	>
 		{#each notifications as notification (notification.id)}
 			<div
 				transition:fade={{ duration: 300 }}
 				class="rounded-lg border p-4 shadow-lg {getColorClasses(notification.type)}"
+				style="pointer-events: auto;"
 			>
 				<div class="flex items-start">
 					<div class="flex-shrink-0">

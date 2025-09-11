@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { orders } from '$lib/stores/orders.js';
-	import { ui, notify } from '$lib/stores/ui.js';
+	import { ui } from '$lib/stores/ui.js';
+	import { notificationStore } from '$lib/stores/notifications.js';
 	import OrderForm from '$lib/components/OrderForm.svelte';
 	import OrderDetails from '$lib/components/OrderDetails.svelte';
 
@@ -63,11 +64,11 @@
 		const result = await orders.createOrder(orderData);
 
 		if (result.success) {
-			notify.success('Pedido criado com sucesso!');
+			notificationStore.success('Pedido criado com sucesso!');
 			ui.closeModal('orderForm');
 			loadOrders();
 		} else {
-			notify.error(result.error || 'Erro ao criar pedido');
+			notificationStore.error(result.error || 'Erro ao criar pedido');
 		}
 	}
 
@@ -75,10 +76,10 @@
 		const result = await orders.updateOrder(orderId, { status: status as any });
 
 		if (result.success) {
-			notify.success('Status atualizado com sucesso!');
+			notificationStore.success('Status atualizado com sucesso!');
 			loadOrders();
 		} else {
-			notify.error(result.error || 'Erro ao atualizar status');
+			notificationStore.error(result.error || 'Erro ao atualizar status');
 		}
 	}
 
@@ -162,15 +163,17 @@
 				Gerencie todos os pedidos de aluguel e venda
 			</p>
 		</div>
-		<button
-			on:click={openCreateForm}
-			class="btn btn-primary"
-		>
-			<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-			</svg>
-			Novo Pedido
-		</button>
+		<div class="flex gap-2">
+			<button
+				on:click={openCreateForm}
+				class="btn btn-primary"
+			>
+				<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+				</svg>
+				Novo Pedido
+			</button>
+		</div>
 	</div>
 
 	<!-- Search and Filters -->

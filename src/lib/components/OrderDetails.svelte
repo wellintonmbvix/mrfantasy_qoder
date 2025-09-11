@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import { orders } from '$lib/stores/orders.js';
-	import { notify } from '$lib/stores/ui.js';
+	import { notificationStore } from '$lib/stores/notifications.js';
 	import { user, isManager } from '$lib/stores/auth.js';
+    import { notify } from '$lib/stores/ui';
 	
 	const dispatch = createEventDispatcher();
 	
@@ -47,16 +48,16 @@
 			const result = await orders.updateOrder(orderId, { orderItems });
 			
 			if (result.success) {
-				notify.success(`Status do item atualizado com sucesso!`);
+				notificationStore.success(`Status do item atualizado com sucesso!`);
 				// Update local data
 				orderData.orderItems = orderData.orderItems.map((item: any) => 
 					item.id === itemId ? { ...item, [field]: value } : item
 				);
 			} else {
-				notify.error(result.error || 'Erro ao atualizar status do item');
+				notificationStore.error(result.error || 'Erro ao atualizar status do item');
 			}
 		} catch (err) {
-			notify.error('Erro de conexão');
+			notificationStore.error('Erro de conexão');
 		} finally {
 			updatingItems.delete(itemId);
 			updatingItems = updatingItems; // Trigger reactivity
