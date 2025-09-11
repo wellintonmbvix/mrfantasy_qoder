@@ -233,6 +233,40 @@ function createOrdersStore() {
 				return { success: false, error: 'Erro de conexão' };
 			}
 		},
+		updateRentalDates: async (id: number, rentalStartDate?: Date, rentalEndDate?: Date) => {
+			try {
+				const updateData: { rentalStartDate?: string; rentalEndDate?: string } = {};
+				
+				if (rentalStartDate) {
+					updateData.rentalStartDate = rentalStartDate.toISOString();
+				}
+				if (rentalEndDate) {
+					updateData.rentalEndDate = rentalEndDate.toISOString();
+				}
+
+				const response = await fetch(`/api/orders/${id}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(updateData)
+				});
+
+				const data = await response.json();
+
+				if (response.ok) {
+					update(state => ({
+						...state,
+						orders: state.orders.map(order =>
+							order.id === id ? data : order
+						)
+					}));
+					return { success: true, order: data };
+				} else {
+					return { success: false, error: data.error };
+				}
+			} catch (error) {
+				return { success: false, error: 'Erro de conexão' };
+			}
+		},
 		clearError: () => {
 			update(state => ({ ...state, error: null }));
 		}

@@ -110,6 +110,49 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 			return json({ error: 'Pedido não encontrado' }, { status: 404 });
 		}
 
+		// Validar se o status permite edição de datas de aluguel
+		if ((validatedData.rentalStartDate || validatedData.rentalEndDate) && 
+			['DELIVERED', 'RETURNED', 'CANCELLED'].includes(currentOrder.status)) {
+			return json(
+				{ error: 'Não é possível alterar datas de aluguel quando o pedido está Entregue, Devolvido ou Cancelado' },
+				{ status: 400 }
+			);
+		}
+
+		// Validar consistência das datas de aluguel
+		if (validatedData.rentalStartDate || validatedData.rentalEndDate) {
+			// Determinar datas a serem usadas para validação
+			const startDate = validatedData.rentalStartDate || currentOrder.rentalStartDate;
+			const endDate = validatedData.rentalEndDate || currentOrder.rentalEndDate;
+			const orderDate = currentOrder.orderDate;
+
+			// Validar que data de início não é anterior à data do pedido
+			if (startDate && orderDate) {
+				const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+				const orderDateOnly = new Date(orderDate.getFullYear(), orderDate.getMonth(), orderDate.getDate());
+				
+				if (startDateOnly < orderDateOnly) {
+					return json(
+						{ error: 'Data de início do aluguel não pode ser anterior à data do pedido' },
+						{ status: 400 }
+					);
+				}
+			}
+
+			// Validar que data de início é anterior à data de fim
+			if (startDate && endDate) {
+				const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+				const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+				
+				if (startDateOnly >= endDateOnly) {
+					return json(
+						{ error: 'Data de início do aluguel deve ser anterior à data de fim' },
+						{ status: 400 }
+					);
+				}
+			}
+		}
+
 		// Validar permissões para alteração de status para CANCELLED
 		if (validatedData.status === 'CANCELLED' && currentOrder.status !== 'CANCELLED') {
 			const roleCheck = requireRole(locals, 'MANAGER');
