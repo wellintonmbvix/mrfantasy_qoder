@@ -247,4 +247,4 @@ Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalh
 
 ## Suporte
 
-Para suporte, envie um email para [seu-email] ou abra uma issue no GitHub.
+Para suporte, envie um email para wellinton.m.b.vix@gmail.com ou abra uma issue no GitHub.
