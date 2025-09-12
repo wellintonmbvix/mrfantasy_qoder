@@ -251,7 +251,7 @@
 							<div style="margin: 2px 0; text-align: right;">
 								{item.quantity}    {formatCurrency(item.unitPrice)}   {formatCurrency(item.discountValue)}    {formatCurrency(item.totalPrice)}
 							</div>
-							{#if item.itemType === 'RENTAL'}
+							{#if item.itemType === 'SALE'}
 								<div style="margin: 2px 0; text-align: right;">Item vendido</div>
 							{/if}
 						{/each}
@@ -274,8 +274,8 @@
 						{/if}
 
 						{#if receiptData.company.observacaoAluguel}
-							<!-- Só exibe observação de aluguel se não houver apenas itens RENTAL -->
-							{#if !receiptData.items.every((item: any) => item.itemType === 'RENTAL')}
+							<!-- Só exibe observação de aluguel se houver algum item RENTAL -->
+							{#if receiptData.items.some((item: any) => item.itemType === 'RENTAL')}
 								<div style="margin-top: 8px; margin-bottom: 22px;">
 									{@html formatTextWithLineBreaks(receiptData.company.observacaoAluguel)}
 								</div>
