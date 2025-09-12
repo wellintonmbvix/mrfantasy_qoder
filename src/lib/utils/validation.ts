@@ -125,6 +125,34 @@ export const updateUserSchema = userSchema.partial().extend({
 	id: z.number().int().positive().optional()
 });
 
+// Cash Transaction validation schemas
+export const cashTransactionSchema = z.object({
+	type: z.enum(['FUND', 'WITHDRAWAL', 'SUPPLY', 'SURPLUS'], {
+		errorMap: () => ({ message: 'Tipo de lançamento inválido' })
+	}),
+	amount: z.number({
+		invalid_type_error: 'Valor deve ser um número',
+		required_error: 'Valor é obrigatório'
+	})
+		.positive('Valor deve ser positivo')
+		.max(999999.99, 'Valor muito alto')
+		.refine(val => Number(val.toFixed(2)) === val, 'Valor deve ter no máximo 2 casas decimais'),
+	description: z.string()
+		.max(500, 'Descrição deve ter no máximo 500 caracteres')
+		.trim()
+		.optional()
+});
+
+export const cancelCashTransactionSchema = z.object({
+	id: z.number()
+		.int('ID inválido')
+		.positive('ID deve ser positivo'),
+	cancelReason: z.string()
+		.min(10, 'Motivo do cancelamento deve ter pelo menos 10 caracteres')
+		.max(500, 'Motivo deve ter no máximo 500 caracteres')
+		.trim()
+});
+
 // Order validation schemas
 export const orderItemSchema = z.object({
 	productId: z.number()

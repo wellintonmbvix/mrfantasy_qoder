@@ -23,6 +23,8 @@ model User {
   // Relations
   orders       Order[]
   inventoryLogs InventoryLog[]
+  cashTransactions CashTransaction[]
+  cancelledCashTransactions CashTransaction[] @relation("CashTransactionCancelledBy")
 
   @@map("users")
 }
@@ -250,11 +252,43 @@ model Settings {
   @@map("settings")
 }
 
+model CashTransaction {
+  id              Int                    @id @default(autoincrement())
+  type            CashTransactionType    @map("transaction_type")
+  amount          Decimal                @db.Decimal(10, 2)
+  description     String?                @db.Text
+  userId          Int                    @map("user_id")
+  status          CashTransactionStatus  @default(ACTIVE)
+  cancelledAt     DateTime?              @map("cancelled_at")
+  cancelledBy     Int?                   @map("cancelled_by")
+  cancelReason    String?                @db.Text @map("cancel_reason")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+
+  // Relations
+  user            User                   @relation(fields: [userId], references: [id])
+  cancelledByUser User?                  @relation("CashTransactionCancelledBy", fields: [cancelledBy], references: [id])
+
+  @@map("cash_transactions")
+}
+
 // Enums
 enum UserRole {
   ADMIN
   MANAGER
   EMPLOYEE
+}
+
+enum CashTransactionType {
+  FUND           // Fundo de caixa - Crédito
+  WITHDRAWAL     // Sangria - Débito
+  SUPPLY         // Suprimento - Crédito
+  SURPLUS        // Sobra de caixa - Crédito
+}
+
+enum CashTransactionStatus {
+  ACTIVE
+  CANCELLED
 }
 
 enum ProductType {
