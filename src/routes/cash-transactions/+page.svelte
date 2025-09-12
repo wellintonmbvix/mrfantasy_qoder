@@ -21,8 +21,8 @@
 	let localFilters = {
 		type: '',
 		status: 'ACTIVE',
-		startDate: '',
-		endDate: ''
+		startDate: new Date().toISOString().split('T')[0], // Data atual
+		endDate: new Date().toISOString().split('T')[0] // Data atual também para endDate
 	};
 
 	// Form de criação
@@ -37,18 +37,31 @@
 	$: canCancel = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
 	// Cálculo do resumo dos valores
-	$: totalCredits = $cashTransactions.transactions
-		.filter(t => transactionTypeOperations[t.type] === 'CREDIT')
-		.reduce((sum, t) => sum + t.amount, 0);
+	$: totalCredits = (() => {
+		const validTransactions = Array.isArray($cashTransactions.transactions) ? $cashTransactions.transactions : [];
+		const transactionCredits = validTransactions
+			.filter(t => transactionTypeOperations[t.type] === 'CREDIT')
+			.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+		const cashPayments = Number($cashTransactions.cashPaymentsSum) || 0;
+		return transactionCredits + cashPayments;
+	})();
 	
-	$: totalDebits = $cashTransactions.transactions
-		.filter(t => transactionTypeOperations[t.type] === 'DEBIT')
-		.reduce((sum, t) => sum + t.amount, 0);
+	$: totalDebits = (() => {
+		const validTransactions = Array.isArray($cashTransactions.transactions) ? $cashTransactions.transactions : [];
+		return validTransactions
+			.filter(t => transactionTypeOperations[t.type] === 'DEBIT')
+			.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+	})();
 	
 	$: netBalance = totalCredits - totalDebits;
 
 	onMount(() => {
-		cashTransactionActions.fetchTransactions();
+		// Aplicar filtros iniciais com a data atual
+		cashTransactionActions.fetchTransactions({
+			status: 'ACTIVE',
+			startDate: localFilters.startDate,
+			endDate: localFilters.endDate
+		});
 	});
 
 	// Funções auxiliares
@@ -129,10 +142,15 @@
 		localFilters = {
 			type: '',
 			status: 'ACTIVE',
-			startDate: '',
-			endDate: ''
+			startDate: new Date().toISOString().split('T')[0], // Manter data atual
+			endDate: new Date().toISOString().split('T')[0] // Manter data atual também
 		};
-		await cashTransactionActions.fetchTransactions({ page: 1, status: 'ACTIVE' });
+		await cashTransactionActions.fetchTransactions({ 
+			page: 1, 
+			status: 'ACTIVE',
+			startDate: localFilters.startDate,
+			endDate: localFilters.endDate
+		});
 	}
 
 	async function changePage(page: number) {
@@ -411,6 +429,7 @@
 							</svg>
 							<div>
 								<p class="text-sm font-medium text-green-600">Total de Entradas</p>
+								<p class="text-xs text-green-500 mb-1">Inclui pagamentos em dinheiro</p>
 								<p class="text-2xl font-bold text-green-800">{formatCurrency(totalCredits)}</p>
 							</div>
 						</div>

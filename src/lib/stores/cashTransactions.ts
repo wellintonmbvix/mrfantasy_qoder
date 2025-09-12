@@ -58,6 +58,7 @@ interface CashTransactionState {
 	currentTransaction: CashTransaction | null;
 	pagination: CashTransactionPagination | null;
 	filters: CashTransactionFilters;
+	cashPaymentsSum: number; // Soma dos pagamentos em dinheiro do período
 	loading: boolean;
 	error: string | null;
 }
@@ -72,6 +73,7 @@ const initialState: CashTransactionState = {
 		limit: 10,
 		status: 'ACTIVE'
 	},
+	cashPaymentsSum: 0,
 	loading: false,
 	error: null
 };
@@ -137,8 +139,9 @@ export const cashTransactionActions = {
 
 			cashTransactions.update(state => ({
 				...state,
-				transactions: data.transactions,
+				transactions: data.transactions || [],
 				pagination: data.pagination,
+				cashPaymentsSum: Number(data.cashPaymentsSum) || 0,
 				loading: false,
 				error: null
 			}));

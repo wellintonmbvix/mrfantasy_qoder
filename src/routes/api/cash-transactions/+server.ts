@@ -38,14 +38,14 @@ export const GET = async ({ url, locals }) => {
 		if (startDate) {
 			where.createdAt = {
 				...where.createdAt,
-				gte: new Date(startDate)
+				gte: new Date(startDate + 'T00:00:00.000Z')
 			};
 		}
 
 		if (endDate) {
 			where.createdAt = {
 				...where.createdAt,
-				lte: new Date(endDate)
+				lte: new Date(endDate + 'T23:59:59.999Z')
 			};
 		}
 
@@ -80,6 +80,52 @@ export const GET = async ({ url, locals }) => {
 			prisma.cashTransaction.count({ where })
 		]);
 
+		// Calcular soma dos pagamentos em dinheiro do mesmo período
+		let cashPaymentsSum = 0;
+		console.log('DEBUG BACKEND: Iniciando cálculo, startDate =', startDate, 'endDate =', endDate);
+		if (startDate || endDate) {
+			// Primeiro, vamos buscar o ID do método de pagamento "Dinheiro"
+			const dinheiroPaymentMethod = await prisma.paymentMethod.findFirst({
+				where: {
+					name: 'Dinheiro',
+					active: true
+				}
+			});
+			
+			if (dinheiroPaymentMethod) {
+				const orderDateFilter: any = {};
+				
+				if (startDate) {
+					orderDateFilter.gte = new Date(startDate + 'T00:00:00.000Z');
+				}
+				
+				if (endDate) {
+					orderDateFilter.lte = new Date(endDate + 'T23:59:59.999Z');
+				}
+
+				// Buscar pagamentos em dinheiro com filtro correto por orderDate
+				const cashPayments = await prisma.orderPayment.findMany({
+					where: {
+						paymentMethodId: dinheiroPaymentMethod.id,
+						order: {
+							orderDate: orderDateFilter
+						}
+					},
+					select: {
+						amount: true
+					}
+				});
+
+				cashPaymentsSum = cashPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+				console.log('DEBUG BACKEND: cashPaymentsSum =', cashPaymentsSum);
+			} else {
+				console.log('DEBUG BACKEND: Método Dinheiro não encontrado, cashPaymentsSum = 0');
+			}
+		} else {
+			console.log('DEBUG BACKEND: Sem filtros de data, cashPaymentsSum = 0');
+		}
+
+
 		return json({
 			transactions,
 			pagination: {
@@ -87,7 +133,14 @@ export const GET = async ({ url, locals }) => {
 				limit,
 				total,
 				pages: Math.ceil(total / limit)
-			}
+			},
+			filters: {
+				startDate,
+				endDate,
+				type,
+				status
+			},
+			cashPaymentsSum: Number(cashPaymentsSum) || 0
 		});
 	} catch (error) {
 		console.error('Erro ao buscar transações de caixa:', error);
