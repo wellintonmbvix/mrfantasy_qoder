@@ -268,7 +268,7 @@ export const companySchema = z.object({
 		.optional()
 		.or(z.literal('')),
 	observacaoAluguel: z.string()
-		.max(1000, 'Observação deve ter no máximo 1000 caracteres')
+		.max(9000, 'Observação deve ter no máximo 9000 caracteres')
 		.trim()
 		.optional()
 		.or(z.literal(''))
