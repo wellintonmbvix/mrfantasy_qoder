@@ -5,7 +5,7 @@
 	import { notificationStore } from '$lib/stores/notifications.js';
 	import OrderForm from '$lib/components/OrderForm.svelte';
 	import OrderDetails from '$lib/components/OrderDetails.svelte';
-	import Receipt from '$lib/components/Receipt.svelte';
+	import ReceiptSelector from '$lib/components/ReceiptSelector.svelte';
 
 	let search = '';
 	let selectedStatus = '';
@@ -567,7 +567,7 @@
 
 <!-- Receipt Modal -->
 {#if showReceipt && selectedOrderIdForReceipt}
-	<Receipt
+	<ReceiptSelector
 		orderId={selectedOrderIdForReceipt}
 		on:close={closeReceipt}
 	/>

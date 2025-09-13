@@ -16,9 +16,25 @@ function verifyToken(token: string): any {
 }
 
 // GET - Buscar configurações do sistema
-export const GET: RequestHandler = async ({ request, cookies }) => {
+export const GET: RequestHandler = async ({ request, cookies, url }) => {
 	try {
-		// Verificar autenticação via cookie
+		// Verificar se é uma consulta pública (apenas para receiptInBobina)
+		const publicQuery = url.searchParams.get('public') === 'true';
+		
+		if (publicQuery) {
+			// Para consultas públicas, retornar apenas receiptInBobina
+			const settings = await (prisma as any).settings.findFirst({
+				select: {
+					receiptInBobina: true
+				}
+			});
+			
+			// Se não há configurações, retornar valor padrão
+			const result = settings || { receiptInBobina: false };
+			return json({ settings: result });
+		}
+		
+		// Para consultas completas, verificar autenticação
 		const token = cookies.get('auth-token');
 		if (!token) {
 			return error(401, { message: 'Token não encontrado' });
@@ -34,7 +50,7 @@ export const GET: RequestHandler = async ({ request, cookies }) => {
 			return error(403, { message: 'Acesso negado. Apenas administradores e gerentes podem acessar as configurações do sistema.' });
 		}
 
-		// Buscar configurações do sistema (sempre haverá apenas um registro)
+		// Buscar configurações completas do sistema
 		const settings = await (prisma as any).settings.findFirst();
 
 		return json({ settings });
