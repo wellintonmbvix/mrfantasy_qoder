@@ -100,6 +100,11 @@
 		};
 		return labels[status as keyof typeof labels] || status;
 	}
+	
+	// Função para verificar se o pedido está cancelado
+	function isOrderCancelled() {
+		return orderData?.status === 'CANCELLED';
+	}
 		
 		function getOrderTypeLabel() {
 			if (orderData && orderData.orderItems) {
@@ -357,28 +362,33 @@
 									<div class="bg-gray-50 rounded-lg p-4">
 										<div class="flex items-center justify-between">
 											<span class="text-sm font-medium text-gray-700">Status da Retirada</span>
-											<label class="inline-flex items-center cursor-pointer">
-												<input type="checkbox" checked={item.itemTaken} disabled={updatingItems.has(item.id)}
+											<label class="inline-flex items-center {isOrderCancelled() ? 'cursor-not-allowed' : 'cursor-pointer'}">
+												<input type="checkbox" checked={item.itemTaken} disabled={updatingItems.has(item.id) || isOrderCancelled()}
 													on:change={(e) => {
 														const target = e.target as HTMLInputElement;
 														if (target) {
 															updateItemStatus(item.id, 'itemTaken', target.checked);
 														}
 													}}
-													class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-5 w-5"/>
-												<span class="ml-3 text-lg font-medium {item.itemTaken ? 'text-green-800' : 'text-gray-700'}">
+													class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-5 w-5 {isOrderCancelled() ? 'opacity-50' : ''}"/>
+												<span class="ml-3 text-lg font-medium {item.itemTaken ? 'text-green-800' : 'text-gray-700'} {isOrderCancelled() ? 'opacity-50' : ''}">
 													{item.itemTaken ? 'Retirado' : 'Não retirado'}
 												</span>
 											</label>
 										</div>
+										{#if isOrderCancelled()}
+											<div class="mt-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded border">
+												<span>Controle desabilitado - Pedido cancelado</span>
+											</div>
+										{/if}
 									</div>
 									{#if item.itemType === 'RENTAL'}
 										<div class="bg-gray-50 rounded-lg p-4">
 											<div class="flex items-center justify-between">
 												<span class="text-sm font-medium text-gray-700">Status da Devolução</span>
 												<div class="flex flex-col items-end">
-													<label class="inline-flex items-center cursor-pointer">
-														<input type="checkbox" checked={item.itemReturned} disabled={updatingItems.has(item.id)}
+													<label class="inline-flex items-center {isOrderCancelled() ? 'cursor-not-allowed' : 'cursor-pointer'}">
+														<input type="checkbox" checked={item.itemReturned} disabled={updatingItems.has(item.id) || isOrderCancelled()}
 															on:change={(e) => {
 																const target = e.target as HTMLInputElement;
 																if (!target) return;
@@ -389,12 +399,16 @@
 																}
 																updateItemStatus(item.id, 'itemReturned', target.checked);
 															}}
-															class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-5 w-5"/>
-														<span class="ml-3 text-lg font-medium {item.itemReturned ? 'text-purple-800' : 'text-gray-700'}">
+															class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-5 w-5 {isOrderCancelled() ? 'opacity-50' : ''}"/>
+														<span class="ml-3 text-lg font-medium {item.itemReturned ? 'text-purple-800' : 'text-gray-700'} {isOrderCancelled() ? 'opacity-50' : ''}">
 															{item.itemReturned ? 'Devolvido' : 'Não devolvido'}
 														</span>
 													</label>
-													{#if item.itemReturned && !$isManager}
+													{#if isOrderCancelled()}
+														<div class="mt-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded border">
+															<span>Controle desabilitado - Pedido cancelado</span>
+														</div>
+													{:else if item.itemReturned && !$isManager}
 														<div class="mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
 															<span>Apenas admin/gerente pode reverter devolução</span>
 														</div>
@@ -438,8 +452,8 @@
 										bind:value={newRentalStartDate}
 										on:input={() => validateDates()}
 										min={new Date(orderData.orderDate).toISOString().split('T')[0]}
-										class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 {dateErrors.start ? 'border-red-300' : ''}"
-										disabled={editingDates}
+										class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 {dateErrors.start ? 'border-red-300' : ''} {isOrderCancelled() ? 'opacity-50' : ''}"
+										disabled={editingDates || isOrderCancelled()}
 									/>
 									{#if dateErrors.start}
 										<p class="mt-1 text-sm text-red-600">{dateErrors.start}</p>
@@ -460,8 +474,8 @@
 										bind:value={newRentalEndDate}
 										on:input={() => validateDates()}
 										min={newRentalStartDate || new Date(orderData.orderDate).toISOString().split('T')[0]}
-										class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 {dateErrors.end ? 'border-red-300' : ''}"
-										disabled={editingDates}
+										class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 {dateErrors.end ? 'border-red-300' : ''} {isOrderCancelled() ? 'opacity-50' : ''}"
+										disabled={editingDates || isOrderCancelled()}
 									/>
 									{#if dateErrors.end}
 										<p class="mt-1 text-sm text-red-600">{dateErrors.end}</p>
@@ -492,21 +506,36 @@
 								</div>
 							</div>
 
+							<!-- Aviso para pedido cancelado -->
+							{#if isOrderCancelled()}
+								<div class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+									<div class="flex">
+										<svg class="w-5 h-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+											<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+										</svg>
+										<div class="text-sm">
+											<p class="text-red-800 font-medium">Edição não permitida</p>
+											<p class="text-red-700 mt-1">As datas do aluguel não podem ser editadas pois o pedido está <strong>Cancelado</strong>.</p>
+										</div>
+									</div>
+								</div>
+							{/if}
+													
 							<!-- Botões de Ação -->
 							<div class="flex items-center justify-end space-x-3">
 								<button
 									type="button"
 									on:click={cancelDateChanges}
 									class="btn btn-secondary"
-									disabled={editingDates}
+									disabled={editingDates || isOrderCancelled()}
 								>
 									Cancelar
 								</button>
 								<button
 									type="button"
 									on:click={saveDateChanges}
-									class="btn btn-primary"
-									disabled={editingDates || !newRentalStartDate || !newRentalEndDate || Object.keys(dateErrors).length > 0}
+									class="btn btn-primary {isOrderCancelled() ? 'opacity-50' : ''}"
+									disabled={editingDates || isOrderCancelled() || !newRentalStartDate || !newRentalEndDate || Object.keys(dateErrors).length > 0}
 								>
 									{#if editingDates}
 										<svg class="animate-spin -ml-1 mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24">
