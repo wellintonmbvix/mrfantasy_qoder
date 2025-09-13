@@ -83,6 +83,7 @@
 									line-height: 1.2;
 									width: 80mm;
 									max-width: 80mm;
+									position: relative;
 								}
 								.text-right {
 									text-align: right;
@@ -108,6 +109,19 @@
 									border-top: 1px solid #000;
 									padding-top: 5px;
 								}
+								.watermark {
+									position: absolute;
+									top: 50%;
+									left: 50%;
+									transform: translate(-50%, -50%) rotate(-45deg);
+									font-size: 30px;
+									font-weight: bold;
+									color: #dc2626;
+									opacity: 0.3;
+									pointer-events: none;
+									z-index: 10;
+									user-select: none;
+								}
 								@page {
 									size: 80mm auto;
 									margin: 0;
@@ -117,11 +131,18 @@
 										print-color-adjust: exact;
 										-webkit-print-color-adjust: exact;
 									}
+									.watermark {
+										color: #dc2626 !important;
+										opacity: 0.3 !important;
+									}
 								}
 							</style>
 						</head>
 						<body>
-							${receiptElement.innerHTML}
+							<div style="position: relative;">
+								${receiptData.order.status === 'CANCELLED' ? '<div class="watermark">CANCELADO</div>' : ''}
+								${receiptElement.innerHTML}
+							</div>
 						</body>
 					</html>
 				`);
@@ -178,7 +199,15 @@
 			{:else if receiptData}
 				<!-- Receipt Preview -->
 				<div class="bg-gray-50 p-4 rounded-lg mb-4">
-					<div id="receipt-content" class="bg-white p-4 font-mono text-xs leading-tight" style="width: 80mm; max-width: 80mm;">
+					<div id="receipt-content" class="bg-white p-4 font-mono text-xs leading-tight relative" style="width: 80mm; max-width: 80mm;">
+						<!-- Watermark for cancelled orders -->
+						{#if receiptData.order.status === 'CANCELLED'}
+							<div class="absolute inset-0 flex items-center justify-center pointer-events-none" style="z-index: 10;">
+								<div class="text-red-500 text-4xl font-bold opacity-30 transform rotate-[-45deg] select-none">
+									CANCELADO
+								</div>
+							</div>
+						{/if}
 						<!-- Company Header -->
 						<div style="text-align: center;">
 							<div style="margin: 2px 0; font-weight: bold;">{receiptData.company.nomeFantasia}</div>
