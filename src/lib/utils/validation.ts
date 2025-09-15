@@ -172,6 +172,12 @@ export const orderItemSchema = z.object({
 		.min(0, 'Valor do desconto deve ser positivo')
 		.max(100, 'Desconto percentual não pode ser maior que 100%')
 		.optional(),
+	surchargeType: z.enum(['PERCENTAGE', 'FIXED'], {
+		errorMap: () => ({ message: 'Tipo de acréscimo inválido' })
+	}).optional(),
+	surchargeValue: z.number()
+		.min(0, 'Valor do acréscimo deve ser positivo')
+		.optional(),
 	subtotal: z.number()
 		.min(0, 'Subtotal deve ser positivo')
 		.max(999999.99, 'Subtotal muito alto')
@@ -187,6 +193,18 @@ export const orderItemSchema = z.object({
 }, {
 	message: 'Desconto percentual não pode ser maior que 100%',
 	path: ['discountValue']
+}).refine((data) => {
+	// Se há acréscimo, o tipo deve ser especificado
+	return !data.surchargeValue || data.surchargeType;
+}, {
+	message: 'Tipo de acréscimo é obrigatório quando há valor de acréscimo',
+	path: ['surchargeType']
+}).refine((data) => {
+	// Se o tipo é percentual, o valor não pode ser maior que 100
+	return data.surchargeType !== 'PERCENTAGE' || !data.surchargeValue || data.surchargeValue <= 100;
+}, {
+	message: 'Acréscimo percentual não pode ser maior que 100%',
+	path: ['surchargeValue']
 });
 
 export const orderSchema = z.object({
@@ -207,6 +225,12 @@ export const orderSchema = z.object({
 	}).optional(),
 	discountValue: z.number()
 		.min(0, 'Valor do desconto deve ser positivo')
+		.optional(),
+	surchargeType: z.enum(['PERCENTAGE', 'FIXED'], {
+		errorMap: () => ({ message: 'Tipo de acréscimo inválido' })
+	}).optional(),
+	surchargeValue: z.number()
+		.min(0, 'Valor do acréscimo deve ser positivo')
 		.optional(),
 	totalAmount: z.number()
 		.min(0, 'Valor total deve ser positivo')
@@ -229,6 +253,18 @@ export const orderSchema = z.object({
 }, {
 	message: 'Desconto percentual do pedido não pode ser maior que 100%',
 	path: ['discountValue']
+}).refine((data) => {
+	// Se há acréscimo no pedido, o tipo deve ser especificado
+	return !data.surchargeValue || data.surchargeType;
+}, {
+	message: 'Tipo de acréscimo é obrigatório quando há valor de acréscimo',
+	path: ['surchargeType']
+}).refine((data) => {
+	// Se o tipo é percentual, o valor não pode ser maior que 100
+	return data.surchargeType !== 'PERCENTAGE' || !data.surchargeValue || data.surchargeValue <= 100;
+}, {
+	message: 'Acréscimo percentual do pedido não pode ser maior que 100%',
+	path: ['surchargeValue']
 });
 
 // Authentication validation schemas
@@ -474,6 +510,19 @@ export function applyDiscount(amount: number, discountType: 'PERCENTAGE' | 'FIXE
 	return Math.max(0, amount - discountAmount);
 }
 
+// Surcharge calculation utilities
+export function calculateSurcharge(amount: number, surchargeType: 'PERCENTAGE' | 'FIXED', surchargeValue: number): number {
+	if (surchargeType === 'PERCENTAGE') {
+		return (amount * surchargeValue) / 100;
+	}
+	return surchargeValue; // Fixed surcharge is added as-is
+}
+
+export function applySurcharge(amount: number, surchargeType: 'PERCENTAGE' | 'FIXED', surchargeValue: number): number {
+	const surchargeAmount = calculateSurcharge(amount, surchargeType, surchargeValue);
+	return amount + surchargeAmount;
+}
+
 // Function to distribute order-level discount across items proportionally
 export function distributeOrderDiscount(
 	items: Array<{ unitPrice: number; quantity: number }>,
@@ -501,6 +550,38 @@ export function distributeOrderDiscount(
 			return { 
 				discountType: 'FIXED' as const, 
 				discountValue: itemDiscount 
+			};
+		});
+	}
+}
+
+// Function to distribute order-level surcharge across items proportionally
+export function distributeOrderSurcharge(
+	items: Array<{ unitPrice: number; quantity: number }>,
+	orderSurchargeType: 'PERCENTAGE' | 'FIXED',
+	orderSurchargeValue: number
+): Array<{ surchargeType: 'PERCENTAGE' | 'FIXED'; surchargeValue: number }> {
+	const totalAmount = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+	
+	if (totalAmount === 0) {
+		return items.map(() => ({ surchargeType: 'FIXED', surchargeValue: 0 }));
+	}
+	
+	if (orderSurchargeType === 'PERCENTAGE') {
+		// For percentage surcharges, apply same percentage to all items
+		return items.map(() => ({ 
+			surchargeType: 'PERCENTAGE' as const, 
+			surchargeValue: orderSurchargeValue 
+		}));
+	} else {
+		// For fixed surcharges, distribute proportionally
+		return items.map((item) => {
+			const itemTotal = item.unitPrice * item.quantity;
+			const proportion = itemTotal / totalAmount;
+			const itemSurcharge = orderSurchargeValue * proportion;
+			return { 
+				surchargeType: 'FIXED' as const, 
+				surchargeValue: itemSurcharge 
 			};
 		});
 	}

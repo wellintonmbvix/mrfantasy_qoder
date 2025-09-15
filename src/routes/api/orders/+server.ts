@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
 import { z } from 'zod';
-import { calculateDiscount, applyDiscount, distributeOrderDiscount } from '$lib/utils/validation.js';
+import { calculateDiscount, applyDiscount, distributeOrderDiscount, calculateSurcharge, applySurcharge, distributeOrderSurcharge } from '$lib/utils/validation.js';
 
 // Use consistent validation schema
 const OrderItemSchema = z.object({
@@ -11,6 +11,8 @@ const OrderItemSchema = z.object({
 	unitPrice: z.number().min(0, 'Preço unitário deve ser positivo'),
 	discountType: z.enum(['PERCENTAGE', 'FIXED']).optional(),
 	discountValue: z.number().min(0, 'Valor do desconto deve ser positivo').optional(),
+	surchargeType: z.enum(['PERCENTAGE', 'FIXED']).optional(),
+	surchargeValue: z.number().min(0, 'Valor do acréscimo deve ser positivo').optional(),
 	itemType: z.enum(['RENTAL', 'SALE']),
 	// itemTaken será automaticamente definido como true se:
 	// 1. itemType é 'SALE', OU
@@ -29,6 +31,18 @@ const OrderItemSchema = z.object({
 }, {
 	message: 'Desconto percentual não pode ser maior que 100%',
 	path: ['discountValue']
+}).refine((data) => {
+	// Se há acréscimo, o tipo deve ser especificado
+	return !data.surchargeValue || data.surchargeType;
+}, {
+	message: 'Tipo de acréscimo é obrigatório quando há valor de acréscimo',
+	path: ['surchargeType']
+}).refine((data) => {
+	// Se o tipo é percentual, o valor não pode ser maior que 100
+	return data.surchargeType !== 'PERCENTAGE' || !data.surchargeValue || data.surchargeValue <= 100;
+}, {
+	message: 'Acréscimo percentual não pode ser maior que 100%',
+	path: ['surchargeValue']
 });
 
 const OrderPaymentSchema = z.object({
@@ -46,6 +60,8 @@ const OrderSchema = z.object({
 	notes: z.string().optional(),
 	discountType: z.enum(['PERCENTAGE', 'FIXED']).optional(),
 	discountValue: z.number().min(0, 'Valor do desconto deve ser positivo').optional(),
+	surchargeType: z.enum(['PERCENTAGE', 'FIXED']).optional(),
+	surchargeValue: z.number().min(0, 'Valor do acréscimo deve ser positivo').optional(),
 	items: z.array(OrderItemSchema).min(1, 'Pelo menos um item é obrigatório'),
 	payments: z.array(OrderPaymentSchema).min(1, 'Pelo menos um meio de pagamento é obrigatório')
 }).refine((data) => {
@@ -66,6 +82,18 @@ const OrderSchema = z.object({
 }, {
 	message: 'Desconto percentual do pedido não pode ser maior que 100%',
 	path: ['discountValue']
+}).refine((data) => {
+	// Se há acréscimo no pedido, o tipo deve ser especificado
+	return !data.surchargeValue || data.surchargeType;
+}, {
+	message: 'Tipo de acréscimo é obrigatório quando há valor de acréscimo',
+	path: ['surchargeType']
+}).refine((data) => {
+	// Se o tipo é percentual, o valor não pode ser maior que 100
+	return data.surchargeType !== 'PERCENTAGE' || !data.surchargeValue || data.surchargeValue <= 100;
+}, {
+	message: 'Acréscimo percentual do pedido não pode ser maior que 100%',
+	path: ['surchargeValue']
 });
 
 export const GET: RequestHandler = async ({ url, locals }) => {
@@ -227,7 +255,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				productId: parseInt(item.productId),
 				quantity: parseInt(item.quantity),
 				unitPrice: parseFloat(item.unitPrice),
-				discountValue: item.discountValue ? parseFloat(item.discountValue) : undefined
+				discountValue: item.discountValue ? parseFloat(item.discountValue) : undefined,
+				surchargeValue: item.surchargeValue ? parseFloat(item.surchargeValue) : undefined
 			}));
 		}
 		
@@ -245,6 +274,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		
 		if (data.discountValue) {
 			data.discountValue = parseFloat(data.discountValue);
+		}
+		
+		if (data.surchargeValue) {
+			data.surchargeValue = parseFloat(data.surchargeValue);
 		}
 		
 		// Log each item's unitPrice type after conversion
@@ -279,16 +312,52 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}));
 		}
 		
+		// If there's an order-level surcharge, distribute it across items
+		if (validatedData.surchargeType && validatedData.surchargeValue) {
+			const itemSurcharges = distributeOrderSurcharge(
+				processedItems,
+				validatedData.surchargeType,
+				validatedData.surchargeValue
+			);
+			
+			processedItems = processedItems.map((item, index) => ({
+				...item,
+				surchargeType: itemSurcharges[index].surchargeType,
+				surchargeValue: (item.surchargeValue || 0) + itemSurcharges[index].surchargeValue
+			}));
+		}
+		
 		// Calculate subtotal and total amounts
+		// Subtotal = soma dos preços unitários x quantidade (sem descontos/acréscimos)
 		for (const item of processedItems) {
 			subtotalAmount += item.unitPrice * item.quantity;
 		}
 		
-		let totalAmount = subtotalAmount;
+		// Total = soma dos valores finais de cada item (com descontos/acréscimos individuais)
+		let totalAmount = 0;
+		for (const item of processedItems) {
+			let itemTotal = item.unitPrice * item.quantity;
+			
+			// Apply item-level discount first
+			if (item.discountType && item.discountValue && item.discountValue > 0) {
+				itemTotal = applyDiscount(itemTotal, item.discountType, item.discountValue);
+			}
+			
+			// Then apply item-level surcharge
+			if (item.surchargeType && item.surchargeValue && item.surchargeValue > 0) {
+				itemTotal = applySurcharge(itemTotal, item.surchargeType, item.surchargeValue);
+			}
+			
+			totalAmount += itemTotal;
+		}
 		
-		// Apply order-level discount to total
+		// Apply order-level discount and surcharge to total
 		if (validatedData.discountType && validatedData.discountValue) {
-			totalAmount = applyDiscount(subtotalAmount, validatedData.discountType, validatedData.discountValue);
+			totalAmount = applyDiscount(totalAmount, validatedData.discountType, validatedData.discountValue);
+		}
+		
+		if (validatedData.surchargeType && validatedData.surchargeValue) {
+			totalAmount = applySurcharge(totalAmount, validatedData.surchargeType, validatedData.surchargeValue);
 		}
 		
 		// Validate products and stock
@@ -370,6 +439,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					subtotalAmount,
 					discountType: validatedData.discountType || null,
 					discountValue: validatedData.discountValue || null,
+					surchargeType: validatedData.surchargeType || null,
+					surchargeValue: validatedData.surchargeValue || null,
 					totalAmount,
 					orderDate: validatedData.orderDate,
 					rentalStartDate: validatedData.rentalStartDate,
@@ -381,11 +452,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 			// Create order items and update stock
 			for (const item of processedItems) {
-				const itemTotalPrice = applyDiscount(
-					item.unitPrice * item.quantity,
-					item.discountType || 'FIXED',
-					item.discountValue || 0
-				);
+				// Calculate item total price with discount and surcharge
+				let itemTotalPrice = item.unitPrice * item.quantity;
+				
+				// Apply discount first
+				if (item.discountType && item.discountValue && item.discountValue > 0) {
+					itemTotalPrice = applyDiscount(itemTotalPrice, item.discountType, item.discountValue);
+				}
+				
+				// Then apply surcharge
+				if (item.surchargeType && item.surchargeValue && item.surchargeValue > 0) {
+					itemTotalPrice = applySurcharge(itemTotalPrice, item.surchargeType, item.surchargeValue);
+				}
 				
 				// Determine if item should be automatically marked as taken
 				let itemTaken = item.itemTaken || false;
@@ -413,6 +491,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						unitPrice: item.unitPrice,
 						discountType: item.discountType || null,
 						discountValue: item.discountValue || null,
+						surchargeType: item.surchargeType || null,
+						surchargeValue: item.surchargeValue || null,
 						totalPrice: itemTotalPrice,
 						itemType: item.itemType,
 						itemTaken: itemTaken,
@@ -494,11 +574,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			subtotalAmount: Number(createdOrder!.subtotalAmount),
 			totalAmount: Number(createdOrder!.totalAmount),
 			discountValue: createdOrder!.discountValue ? Number(createdOrder!.discountValue) : null,
+			surchargeValue: createdOrder!.surchargeValue ? Number(createdOrder!.surchargeValue) : null,
 			orderItems: createdOrder!.orderItems.map(item => ({
 				...item,
 				unitPrice: Number(item.unitPrice),
 				totalPrice: Number(item.totalPrice),
 				discountValue: item.discountValue ? Number(item.discountValue) : null,
+				surchargeValue: item.surchargeValue ? Number(item.surchargeValue) : null,
 				product: {
 					...item.product,
 					costPrice: Number(item.product.costPrice),

@@ -1,5 +1,5 @@
 import { writable, derived } from 'svelte/store';
-import { calculateDiscount, applyDiscount, distributeOrderDiscount } from '$lib/utils/validation.js';
+import { calculateDiscount, applyDiscount, distributeOrderDiscount, calculateSurcharge, applySurcharge, distributeOrderSurcharge } from '$lib/utils/validation.js';
 
 export interface OrderItemDiscount {
 	id?: number;
@@ -8,12 +8,16 @@ export interface OrderItemDiscount {
 	unitPrice: number;
 	discountType?: 'PERCENTAGE' | 'FIXED';
 	discountValue?: number;
+	surchargeType?: 'PERCENTAGE' | 'FIXED';
+	surchargeValue?: number;
 	itemType: 'RENTAL' | 'SALE';
 }
 
 export interface OrderDiscount {
 	discountType?: 'PERCENTAGE' | 'FIXED';
 	discountValue?: number;
+	surchargeType?: 'PERCENTAGE' | 'FIXED';
+	surchargeValue?: number;
 	items: OrderItemDiscount[];
 }
 
@@ -50,8 +54,14 @@ function createOrderCalculatorStore() {
 		setOrderDiscount: (discountType?: 'PERCENTAGE' | 'FIXED', discountValue?: number) => {
 			update(state => ({ ...state, discountType, discountValue }));
 		},
+		setOrderSurcharge: (surchargeType?: 'PERCENTAGE' | 'FIXED', surchargeValue?: number) => {
+			update(state => ({ ...state, surchargeType, surchargeValue }));
+		},
 		clearOrderDiscount: () => {
 			update(state => ({ ...state, discountType: undefined, discountValue: undefined }));
+		},
+		clearOrderSurcharge: () => {
+			update(state => ({ ...state, surchargeType: undefined, surchargeValue: undefined }));
 		},
 		reset: () => {
 			set({ items: [] });
@@ -66,16 +76,19 @@ export const orderTotals = derived(orderCalculator, ($orderCalculator) => {
 	const items = $orderCalculator.items;
 	const orderDiscountType = $orderCalculator.discountType;
 	const orderDiscountValue = $orderCalculator.discountValue;
+	const orderSurchargeType = $orderCalculator.surchargeType;
+	const orderSurchargeValue = $orderCalculator.surchargeValue;
 
 	// Calcular subtotal (sem descontos)
 	const subtotal = items.reduce((sum, item) => {
 		return sum + (item.unitPrice * item.quantity);
 	}, 0);
 
-	// Aplicar descontos por item
+	// Aplicar descontos e acréscimos por item
 	let itemsWithDiscounts = items.map(item => {
 		const itemSubtotal = item.unitPrice * item.quantity;
 		let itemDiscount = 0;
+		let itemSurcharge = 0;
 		let itemTotal = itemSubtotal;
 
 		if (item.discountType && item.discountValue) {
@@ -83,16 +96,23 @@ export const orderTotals = derived(orderCalculator, ($orderCalculator) => {
 			itemTotal = applyDiscount(itemSubtotal, item.discountType, item.discountValue);
 		}
 
+		if (item.surchargeType && item.surchargeValue) {
+			itemSurcharge = calculateSurcharge(itemTotal, item.surchargeType, item.surchargeValue);
+			itemTotal = applySurcharge(itemTotal, item.surchargeType, item.surchargeValue);
+		}
+
 		return {
 			...item,
 			subtotal: itemSubtotal,
 			discountAmount: itemDiscount,
+			surchargeAmount: itemSurcharge,
 			total: itemTotal
 		};
 	});
 
-	// Aplicar desconto do pedido
+	// Aplicar desconto e acréscimo do pedido
 	let orderDiscountAmount = 0;
+	let orderSurchargeAmount = 0;
 	let finalTotal = subtotal;
 
 	if (orderDiscountType && orderDiscountValue) {
@@ -126,10 +146,43 @@ export const orderTotals = derived(orderCalculator, ($orderCalculator) => {
 		orderDiscountAmount = itemsWithDiscounts.reduce((sum, item) => sum + item.discountAmount, 0);
 	}
 
+	if (orderSurchargeType && orderSurchargeValue) {
+		// Se há acréscimo no pedido, distribuir pelos itens
+		const distributedSurcharges = distributeOrderSurcharge(
+			items,
+			orderSurchargeType,
+			orderSurchargeValue
+		);
+
+		itemsWithDiscounts = itemsWithDiscounts.map((item, index) => {
+			const distributedSurcharge = distributedSurcharges[index];
+			const additionalSurcharge = calculateSurcharge(
+				item.total,
+				distributedSurcharge.surchargeType,
+				distributedSurcharge.surchargeValue
+			);
+
+			return {
+				...item,
+				surchargeAmount: (item.surchargeAmount || 0) + additionalSurcharge,
+				total: item.total + additionalSurcharge
+			};
+		});
+
+		orderSurchargeAmount = calculateSurcharge(finalTotal, orderSurchargeType, orderSurchargeValue);
+		finalTotal = applySurcharge(finalTotal, orderSurchargeType, orderSurchargeValue);
+	} else {
+		// Se não há acréscimo no pedido, somar os totais dos itens
+		finalTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.total, 0);
+		orderSurchargeAmount = itemsWithDiscounts.reduce((sum, item) => sum + (item.surchargeAmount || 0), 0);
+	}
+
 	return {
 		subtotal,
 		orderDiscountAmount,
+		orderSurchargeAmount,
 		totalDiscountAmount: orderDiscountAmount,
+		totalSurchargeAmount: orderSurchargeAmount,
 		total: finalTotal,
 		itemsWithDiscounts
 	};

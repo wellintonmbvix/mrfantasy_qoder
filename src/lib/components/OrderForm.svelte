@@ -3,7 +3,7 @@
 	import { customers } from '$lib/stores/customers.js';
 	import { products } from '$lib/stores/products.js';
 	import { employees } from '$lib/stores/employees.js';
-	import { calculateDiscount, applyDiscount, distributeOrderDiscount } from '$lib/utils/validation.js';
+	import { calculateDiscount, applyDiscount, distributeOrderDiscount, calculateSurcharge, applySurcharge, distributeOrderSurcharge } from '$lib/utils/validation.js';
 	
 	const dispatch = createEventDispatcher();
 	
@@ -21,6 +21,10 @@
 	let orderDiscountType: 'PERCENTAGE' | 'FIXED' | '' = '';
 	let orderDiscountValue: number = 0;
 	
+	// Order-level surcharge fields
+	let orderSurchargeType: 'PERCENTAGE' | 'FIXED' | '' = '';
+	let orderSurchargeValue: number = 0;
+	
 	let orderItems: Array<{
 		productId: number;
 		product?: any;
@@ -30,6 +34,9 @@
 		// Item-level discount fields
 		discountType?: 'PERCENTAGE' | 'FIXED' | '';
 		discountValue?: number;
+		// Item-level surcharge fields
+		surchargeType?: 'PERCENTAGE' | 'FIXED' | '';
+		surchargeValue?: number;
 	}> = [];
 	
 	// Payment methods data
@@ -55,6 +62,10 @@
 	let showCustomerDropdown = false;
 	let showProductDropdown = false;
 	
+	// Settings
+	let settings: any = null;
+	let surchargeEnabled = false;
+	
 	// Reactive declarations
 	let customersData: any;
 	let employeesData: any;
@@ -71,23 +82,36 @@
 		employeesData = $employees;
 		productsData = $products;
 		
-		// Calculate subtotal (before order discount)
+		// Calculate subtotal (before order discount and surcharge)
 		subtotalAmount = orderItems.reduce((sum, item) => {
 			const itemSubtotal = item.quantity * item.unitPrice;
 			const itemDiscountType = item.discountType as 'PERCENTAGE' | 'FIXED' | undefined;
 			const itemDiscountValue = item.discountValue || 0;
+			const itemSurchargeType = item.surchargeType as 'PERCENTAGE' | 'FIXED' | undefined;
+			const itemSurchargeValue = item.surchargeValue || 0;
+			
+			let itemTotal = itemSubtotal;
 			
 			if (itemDiscountType && itemDiscountValue > 0) {
-				return sum + applyDiscount(itemSubtotal, itemDiscountType, itemDiscountValue);
+				itemTotal = applyDiscount(itemTotal, itemDiscountType, itemDiscountValue);
 			}
-			return sum + itemSubtotal;
+			
+			if (itemSurchargeType && itemSurchargeValue > 0) {
+				itemTotal = applySurcharge(itemTotal, itemSurchargeType, itemSurchargeValue);
+			}
+			
+			return sum + itemTotal;
 		}, 0);
 		
-		// Calculate total amount (after order discount)
+		// Calculate total amount (after order discount and surcharge)
+		totalAmount = subtotalAmount;
+		
 		if (orderDiscountType && orderDiscountValue > 0) {
-			totalAmount = applyDiscount(subtotalAmount, orderDiscountType as 'PERCENTAGE' | 'FIXED', orderDiscountValue);
-		} else {
-			totalAmount = subtotalAmount;
+			totalAmount = applyDiscount(totalAmount, orderDiscountType as 'PERCENTAGE' | 'FIXED', orderDiscountValue);
+		}
+		
+		if (orderSurchargeType && orderSurchargeValue > 0) {
+			totalAmount = applySurcharge(totalAmount, orderSurchargeType as 'PERCENTAGE' | 'FIXED', orderSurchargeValue);
 		}
 		
 		totalPayments = orderPayments.reduce((sum, payment) => sum + payment.amount, 0);
@@ -108,7 +132,8 @@
 			employees.fetch({ limit: 50 }),
 			products.fetchProducts({ limit: 50 }),
 			products.fetchGroups(),
-			loadPaymentMethods()
+			loadPaymentMethods(),
+			loadSettings()
 		]);
 		customersList = customersData.customers;
 		employeesList = employeesData.employees || [];
@@ -124,6 +149,24 @@
 			}
 		} catch (error) {
 			console.error('Error loading payment methods:', error);
+		}
+	}
+	
+	async function loadSettings() {
+		try {
+			const response = await fetch('/api/settings');
+			const data = await response.json();
+			if (response.ok && data.settings) {
+				settings = data.settings;
+				// CORRIGIDO: campos habilitados quando inhibit_surcharge = true
+				surchargeEnabled = settings.inhibitSurcharge;
+			} else {
+				surchargeEnabled = false;
+			}
+		} catch (error) {
+			console.error('Error loading settings:', error);
+			// Default to disabled if can't load settings
+			surchargeEnabled = false;
 		}
 	}
 	
@@ -179,7 +222,9 @@
 				unitPrice: defaultPrice,
 				itemType: defaultItemType,
 				discountType: '',
-				discountValue: 0
+				discountValue: 0,
+				surchargeType: '',
+				surchargeValue: 0
 			}];
 		}
 		
@@ -216,6 +261,19 @@
 	function updateItemDiscountValue(index: number, discountValue: number) {
 		const validValue = isNaN(discountValue) ? 0 : Math.max(0, discountValue);
 		orderItems[index].discountValue = validValue;
+	}
+
+	// Surcharge functions
+	function updateItemSurchargeType(index: number, surchargeType: string) {
+		orderItems[index].surchargeType = surchargeType as 'PERCENTAGE' | 'FIXED' | '';
+		if (!surchargeType) {
+			orderItems[index].surchargeValue = 0;
+		}
+	}
+	
+	function updateItemSurchargeValue(index: number, surchargeValue: number) {
+		const validValue = isNaN(surchargeValue) ? 0 : Math.max(0, surchargeValue);
+		orderItems[index].surchargeValue = validValue;
 	}
 
 	function updateItemType(index: number, itemType: 'RENTAL' | 'SALE') {
@@ -258,6 +316,31 @@
 		// Clear order-level discount after distribution
 		orderDiscountType = '';
 		orderDiscountValue = 0;
+	}
+	
+	function applyOrderSurchargeToItems() {
+		if (!orderSurchargeType || orderSurchargeValue <= 0) return;
+		
+		const itemsForDistribution = orderItems.map(item => ({
+			unitPrice: item.unitPrice,
+			quantity: item.quantity
+		}));
+		
+		const distributedSurcharges = distributeOrderSurcharge(
+			itemsForDistribution, 
+			orderSurchargeType as 'PERCENTAGE' | 'FIXED', 
+			orderSurchargeValue
+		);
+		
+		orderItems = orderItems.map((item, index) => ({
+			...item,
+			surchargeType: distributedSurcharges[index].surchargeType,
+			surchargeValue: distributedSurcharges[index].surchargeValue
+		}));
+		
+		// Clear order-level surcharge after distribution
+		orderSurchargeType = '';
+		orderSurchargeValue = 0;
 	}
 	
 	function addPayment() {
@@ -386,10 +469,12 @@
 			rentalStartDate: rentalStartDate ? new Date(rentalStartDate) : undefined,
 			rentalEndDate: rentalEndDate ? new Date(rentalEndDate) : undefined,
 			notes,
-			// Order-level discount
+			// Order-level discount and surcharge
 			subtotalAmount: parseFloat(subtotalAmount.toString()),
 			discountType: orderDiscountType || undefined,
 			discountValue: orderDiscountType && orderDiscountValue > 0 ? parseFloat(orderDiscountValue.toString()) : undefined,
+			surchargeType: orderSurchargeType || undefined,
+			surchargeValue: orderSurchargeType && orderSurchargeValue > 0 ? parseFloat(orderSurchargeValue.toString()) : undefined,
 			totalAmount: parseFloat(totalAmount.toString()),
 			items: orderItems.map(item => ({
 				productId: parseInt(item.productId.toString()),
@@ -398,7 +483,10 @@
 				itemType: item.itemType,
 				// Item-level discount
 				discountType: item.discountType || undefined,
-				discountValue: item.discountType && item.discountValue && item.discountValue > 0 ? parseFloat(item.discountValue.toString()) : undefined
+				discountValue: item.discountType && item.discountValue && item.discountValue > 0 ? parseFloat(item.discountValue.toString()) : undefined,
+				// Item-level surcharge
+				surchargeType: item.surchargeType || undefined,
+				surchargeValue: item.surchargeType && item.surchargeValue && item.surchargeValue > 0 ? parseFloat(item.surchargeValue.toString()) : undefined
 			})),
 			payments: orderPayments.map(payment => ({
 				paymentMethodId: parseInt(payment.paymentMethodId.toString()),
@@ -557,7 +645,7 @@
 									</div>
 								
 									<!-- Item Fields Grid -->
-									<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+									<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 mb-4">
 										<div>
 											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="block text-sm font-medium text-gray-700 mb-1">Quantidade *</label>
@@ -660,6 +748,49 @@
 												disabled={!item.discountType}
 											/>
 										</div>
+										{#if surchargeEnabled}
+											<div>
+												<!-- svelte-ignore a11y_label_has_associated_control -->
+												<label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Acréscimo</label>
+												<select
+													value={item.surchargeType || ''}
+													on:change={(e) => {
+														const target = e.target as HTMLSelectElement;
+														if (target) {
+															updateItemSurchargeType(index, target.value);
+														}
+													}}
+													class="form-input"
+												>
+													<option value="">Sem acréscimo</option>
+													<option value="PERCENTAGE">Percentual (%)</option>
+													<option value="FIXED">Valor Fixo (R$)</option>
+												</select>
+											</div>
+											<div>
+												<!-- svelte-ignore a11y_label_has_associated_control -->
+												<label class="block text-sm font-medium text-gray-700 mb-1">
+													{item.surchargeType === 'PERCENTAGE' ? 'Acréscimo (%)' : 'Acréscimo (R$)'}
+												</label>
+												<input
+													type="number"
+													min="0"
+													max={item.surchargeType === 'PERCENTAGE' ? 100 : undefined}
+													step={item.surchargeType === 'PERCENTAGE' ? '1' : '0.01'}
+													value={item.surchargeValue || 0}
+													on:change={(e) => {
+														const target = e.target as HTMLInputElement;
+														if (target) {
+															const value = parseFloat(target.value);
+															updateItemSurchargeValue(index, isNaN(value) ? 0 : value);
+														}
+													}}
+													class="form-input"
+													placeholder="0"
+													disabled={!item.surchargeType}
+												/>
+											</div>
+										{/if}
 									</div>
 								
 									<!-- Item Totals -->
@@ -669,15 +800,27 @@
 											{#if item.discountType && item.discountValue && item.discountValue > 0}
 												<span class="text-red-600">Desconto: <span class="font-medium">-R$ {calculateDiscount(item.quantity * item.unitPrice, item.discountType, item.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></span>
 											{/if}
+											{#if surchargeEnabled && item.surchargeType && item.surchargeValue && item.surchargeValue > 0}
+												<span class="text-green-600">Acréscimo: <span class="font-medium">+R$ {(() => {
+													let amount = item.quantity * item.unitPrice;
+													if (item.discountType && item.discountValue && item.discountValue > 0) {
+														amount = applyDiscount(amount, item.discountType, item.discountValue);
+													}
+													return calculateSurcharge(amount, item.surchargeType, item.surchargeValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+												})()}</span></span>
+											{/if}
 										</div>
 										<div class="text-lg font-semibold text-gray-900">
 											Total: R$ {
 												(() => {
-													const itemSubtotal = item.quantity * item.unitPrice;
+													let itemTotal = item.quantity * item.unitPrice;
 													if (item.discountType && item.discountValue && item.discountValue > 0) {
-														return applyDiscount(itemSubtotal, item.discountType, item.discountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+														itemTotal = applyDiscount(itemTotal, item.discountType, item.discountValue);
 													}
-													return itemSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+													if (surchargeEnabled && item.surchargeType && item.surchargeValue && item.surchargeValue > 0) {
+														itemTotal = applySurcharge(itemTotal, item.surchargeType, item.surchargeValue);
+													}
+													return itemTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 												})()
 											}
 										</div>
@@ -749,6 +892,56 @@
 						</div>
 					{/if}
 					
+					<!-- Order Level Surcharge Section -->
+					{#if orderItems.length > 0 && surchargeEnabled}
+						<div class="bg-green-50 border border-green-200 rounded-lg p-4">
+							<h5 class="text-md font-medium text-green-800 mb-3">Acréscimo no Pedido</h5>
+							<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+								<div>
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Acréscimo</label>
+									<select
+										bind:value={orderSurchargeType}
+										class="form-input"
+									>
+										<option value="">Sem acréscimo</option>
+										<option value="PERCENTAGE">Percentual (%)</option>
+										<option value="FIXED">Valor Fixo (R$)</option>
+									</select>
+								</div>
+								<div>
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label class="block text-sm font-medium text-gray-700 mb-1">
+										{orderSurchargeType === 'PERCENTAGE' ? 'Acréscimo (%)' : 'Acréscimo (R$)'}
+									</label>
+									<input
+										type="number"
+										min="0"
+										max={orderSurchargeType === 'PERCENTAGE' ? 100 : undefined}
+										step={orderSurchargeType === 'PERCENTAGE' ? '1' : '0.01'}
+										bind:value={orderSurchargeValue}
+										class="form-input"
+										placeholder="0"
+										disabled={!orderSurchargeType}
+									/>
+								</div>
+								<div class="flex items-end">
+									<button
+										type="button"
+										on:click={applyOrderSurchargeToItems}
+										class="btn btn-secondary btn-sm"
+										disabled={!orderSurchargeType || orderSurchargeValue <= 0}
+									>
+										Distribuir aos Itens
+									</button>
+								</div>
+							</div>
+							<div class="text-sm text-gray-600 mt-2">
+								O acréscimo será aplicado proporcionalmente a todos os itens
+							</div>
+						</div>
+					{/if}
+					
 					<!-- Order Summary -->
 					<div class="bg-gray-50 border rounded-lg p-4 mt-6">
 						<h5 class="font-medium text-gray-900 mb-3">Resumo do Pedido</h5>
@@ -760,7 +953,22 @@
 							{#if orderDiscountType && orderDiscountValue > 0}
 								<div class="flex justify-between text-red-600">
 									<span>Desconto no pedido:</span>
-									<span class="font-medium">-R$ {calculateDiscount(subtotalAmount, orderDiscountType, orderDiscountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+									<span class="font-medium">-R$ {(() => {
+										let amount = subtotalAmount;
+										return calculateDiscount(amount, orderDiscountType, orderDiscountValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+									})()}</span>
+								</div>
+							{/if}
+							{#if surchargeEnabled && orderSurchargeType && orderSurchargeValue > 0}
+								<div class="flex justify-between text-green-600">
+									<span>Acréscimo no pedido:</span>
+									<span class="font-medium">+R$ {(() => {
+										let amount = subtotalAmount;
+										if (orderDiscountType && orderDiscountValue > 0) {
+											amount = applyDiscount(amount, orderDiscountType, orderDiscountValue);
+										}
+										return calculateSurcharge(amount, orderSurchargeType, orderSurchargeValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+									})()}</span>
 								</div>
 							{/if}
 							<div class="flex justify-between text-lg font-semibold border-t pt-2">

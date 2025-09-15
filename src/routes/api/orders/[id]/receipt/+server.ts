@@ -101,15 +101,49 @@ export const GET: RequestHandler = async ({ params }) => {
 				name: order.attendant.name,
 				abbreviation: order.attendant.abbreviation
 			} : null,
-			items: order.orderItems.map(item => ({
-				productName: item.product.name,
-				productType: item.product.group?.name || 'Sem categoria',
-				quantity: item.quantity,
-				unitPrice: item.unitPrice,
-				discountValue: item.discountValue || 0,
-				totalPrice: item.totalPrice,
-				itemType: item.itemType
-			})),
+			items: order.orderItems.map(item => {
+				// Converter valores Decimal para number antes das operações
+				const unitPrice = Number(item.unitPrice);
+				const quantity = Number(item.quantity);
+				const baseAmount = unitPrice * quantity;
+				
+				// Calcular o valor real do desconto baseado no tipo
+				let discountAmount = 0;
+				if (item.discountValue && item.discountType) {
+					const discountValue = Number(item.discountValue);
+					if (item.discountType === 'PERCENTAGE') {
+						discountAmount = (baseAmount * discountValue) / 100;
+					} else {
+						discountAmount = discountValue;
+					}
+				}
+				
+				// Calcular o valor real do acréscimo baseado no tipo
+				let surchargeAmount = 0;
+				if (item.surchargeValue && item.surchargeType) {
+					const surchargeValue = Number(item.surchargeValue);
+					if (item.surchargeType === 'PERCENTAGE') {
+						// Acréscimo percentual é aplicado sobre o valor após desconto
+						const amountAfterDiscount = baseAmount - discountAmount;
+						surchargeAmount = (amountAfterDiscount * surchargeValue) / 100;
+					} else {
+						surchargeAmount = surchargeValue;
+					}
+				}
+				
+				// Desconto líquido = desconto calculado - acréscimo calculado
+				const netDiscountAmount = discountAmount - surchargeAmount;
+				
+				return {
+					productName: item.product.name,
+					productType: item.product.group?.name || 'Sem categoria',
+					quantity: quantity,
+					unitPrice: unitPrice,
+					discountValue: netDiscountAmount,
+					totalPrice: Number(item.totalPrice),
+					itemType: item.itemType
+				};
+			}),
 			totals: {
 				totalItems,
 				subtotalAmount: order.subtotalAmount,
