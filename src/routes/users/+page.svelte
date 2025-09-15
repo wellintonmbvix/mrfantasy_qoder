@@ -3,8 +3,10 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { uiStore } from '$lib/stores/userUI.js';
+	import { ui } from '$lib/stores/ui.js';
 	import { notificationStore } from '$lib/stores/notifications.js';
 	import UserForm from '$lib/components/UserForm.svelte';
+	import DeleteConfirmModal from '$lib/components/DeleteConfirmModal.svelte';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -13,12 +15,17 @@
 	let loading = false;
 	let users = data.users || [];
 	let pagination = data.pagination || { page: 1, limit: 10, total: 0, pages: 0 };
+	let deleteUserId: number | null = null;
 	
 	// Reactive declarations
 	let currentPage: number;
+	let uiState: any;
+	let deleteUser: any;
 	
 	$: {
 		currentPage = pagination.page;
+		uiState = $ui;
+		deleteUser = deleteUserId ? users.find((u: any) => u.id === deleteUserId) : null;
 	}
 
 	onMount(() => {
@@ -70,6 +77,11 @@
 
 	function openEditModal(user: any) {
 		uiStore.openUserForm(user);
+	}
+
+	function openDeleteModal(userId: number) {
+		deleteUserId = userId;
+		ui.openModal('deleteConfirm');
 	}
 
 	async function handleUserSubmit(event: CustomEvent) {
@@ -152,39 +164,39 @@
 		}
 	}
 
-	async function deleteUser(user: any) {
-		if (!confirm(`Tem certeza que deseja excluir o usuário "${user.username}"?`)) {
-			return;
-		}
-
-		loading = true;
-		try {
-			const response = await fetch(`/api/users/${user.id}`, {
-				method: 'DELETE'
-			});
-
-			const result = await response.json();
-
-			if (response.ok) {
-				notificationStore.add({
-					type: 'success',
-					message: 'Usuário excluído com sucesso!'
+	async function handleDelete() {
+		if (deleteUserId) {
+			loading = true;
+			try {
+				const response = await fetch(`/api/users/${deleteUserId}`, {
+					method: 'DELETE'
 				});
-				refreshData();
-			} else {
+
+				const result = await response.json();
+
+				if (response.ok) {
+					notificationStore.add({
+						type: 'success',
+						message: 'Usuário excluído com sucesso!'
+					});
+					ui.closeModal('deleteConfirm');
+					refreshData();
+				} else {
+					notificationStore.add({
+						type: 'error',
+						message: result.error || 'Erro ao excluir usuário'
+					});
+				}
+			} catch (error) {
 				notificationStore.add({
-					type: 'error',
-					message: result.error || 'Erro ao excluir usuário'
-				});
+						type: 'error',
+						message: 'Erro de conexão'
+					});
+				} finally {
+				loading = false;
 			}
-		} catch (error) {
-			notificationStore.add({
-				type: 'error',
-				message: 'Erro de conexão'
-			});
-		} finally {
-			loading = false;
 		}
+		deleteUserId = null;
 	}
 
 	function getRoleBadgeClass(role: string) {
@@ -359,7 +371,7 @@
 										</button>
 										<!-- svelte-ignore a11y_consider_explicit_label -->
 										<button
-											on:click={() => deleteUser(user)}
+											on:click={() => openDeleteModal(user.id)}
 											class="text-red-600 hover:text-red-900 transition-colors"
 											title="Excluir usuário"
 											disabled={loading}
@@ -459,5 +471,16 @@
 		user={$uiStore.userForm.user}
 		on:submit={handleUserSubmit}
 		on:cancel={handleUserCancel}
+	/>
+{/if}
+
+<!-- Delete Confirmation Modal -->
+{#if uiState.modals.deleteConfirm}
+	<DeleteConfirmModal
+		title="Excluir Usuário"
+		message={deleteUser ? `Tem certeza que deseja excluir o usuário "${deleteUser.username}"? Esta ação não pode ser desfeita.` : 'Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.'}
+		loading={loading}
+		on:confirm={handleDelete}
+		on:cancel={() => ui.closeModal('deleteConfirm')}
 	/>
 {/if}
