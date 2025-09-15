@@ -23,38 +23,6 @@
 		modalTitle = isEdit ? 'Editar Grupo' : 'Novo Grupo';
 	}
 	
-	const categories = [
-		'FANTASY',
-		'ACCESSORY',
-		'SUPERHERO',
-		'DISNEY',
-		'PRINCESS',
-		'HALLOWEEN',
-		'CARNIVAL',
-		'PARTY',
-		'COSPLAY',
-		'HISTORICAL',
-		'PROFESSION',
-		'ANIMAL',
-		'OTHER'
-	];
-	
-	const categoryLabels: Record<string, string> = {
-		'FANTASY': 'Fantasias',
-		'ACCESSORY': 'Acessórios',
-		'SUPERHERO': 'Super-heróis',
-		'DISNEY': 'Disney',
-		'PRINCESS': 'Princesas',
-		'HALLOWEEN': 'Halloween',
-		'CARNIVAL': 'Carnaval',
-		'PARTY': 'Festa',
-		'COSPLAY': 'Cosplay',
-		'HISTORICAL': 'Histórico',
-		'PROFESSION': 'Profissões',
-		'ANIMAL': 'Animais',
-		'OTHER': 'Outros'
-	};
-	
 	function validateForm() {
 		errors = {};
 		
@@ -62,7 +30,7 @@
 			errors.name = 'Nome é obrigatório';
 		}
 		
-		if (!formData.category) {
+		if (!formData.category.trim()) {
 			errors.category = 'Categoria é obrigatória';
 		}
 		
@@ -73,6 +41,7 @@
 		if (!validateForm()) return;
 		
 		loading = true;
+		
 		dispatch('submit', {
 			group: formData,
 			isEdit
@@ -102,17 +71,19 @@
 	<!-- svelte-ignore a11y-click-events-have-key-events -->
 	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 	<div 
-		class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 xl:w-2/5 shadow-lg rounded-md bg-white" 
+		class="relative top-10 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white" 
 		on:click|stopPropagation
+		on:keydown|stopPropagation
+		tabindex="-1"
 		role="document"
 	>
 		<!-- Modal Header -->
 		<div class="flex items-center justify-between pb-4 border-b">
 			<h3 id="modal-title" class="text-lg font-medium text-gray-900">{modalTitle}</h3>
+			<!-- svelte-ignore a11y_consider_explicit_label -->
 			<button
 				on:click={handleCancel}
 				class="text-gray-400 hover:text-gray-600 transition-colors"
-				aria-label="Fechar modal"
 			>
 				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -131,7 +102,7 @@
 						type="text"
 						bind:value={formData.name}
 						class="form-input {errors.name ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
-						placeholder="Ex: Super-heróis, Princesas, Acessórios"
+						placeholder="Digite o nome do grupo"
 						required
 					/>
 					{#if errors.name}
@@ -142,17 +113,14 @@
 				<!-- Category -->
 				<div>
 					<label for="category" class="form-label">Categoria *</label>
-					<select
+					<input
 						id="category"
+						type="text"
 						bind:value={formData.category}
 						class="form-input {errors.category ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
+						placeholder="Ex: Fantasias Infantis, Acessórios"
 						required
-					>
-						<option value="">Selecione uma categoria</option>
-						{#each categories as category}
-							<option value={category}>{categoryLabels[category]}</option>
-						{/each}
-					</select>
+					/>
 					{#if errors.category}
 						<p class="mt-1 text-sm text-red-600">{errors.category}</p>
 					{/if}
@@ -166,11 +134,8 @@
 						bind:value={formData.description}
 						rows="3"
 						class="form-input"
-						placeholder="Descrição do grupo de produtos (opcional)"
+						placeholder="Descrição detalhada do grupo"
 					></textarea>
-					<p class="mt-1 text-sm text-gray-500">
-						Descreva o tipo de produtos que pertencem a este grupo
-					</p>
 				</div>
 			</div>
 			

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
+	import ImageUpload from './ImageUpload.svelte';
 	
 	export let product: any = null;
 	export let groups: any[] = [];
@@ -99,6 +100,10 @@
 		const prefix = formData.productType === 'FANTASY' ? 'FAN' : 'ACC';
 		const timestamp = Date.now().toString().slice(-6);
 		formData.sku = `${prefix}-${timestamp}`;
+	}
+	
+	function handleImageUpload(event: CustomEvent) {
+		formData.imageUrl = event.detail.imageUrl;
 	}
 </script>
 
@@ -319,15 +324,12 @@
 					/>
 				</div>
 				
-				<!-- Image URL -->
+				<!-- Image Upload -->
 				<div class="md:col-span-2">
-					<label for="imageUrl" class="form-label">URL da imagem</label>
-					<input
-						id="imageUrl"
-						type="url"
-						bind:value={formData.imageUrl}
-						class="form-input"
-						placeholder="https://exemplo.com/imagem.jpg"
+					<ImageUpload 
+						currentImageUrl={formData.imageUrl}
+						disabled={loading}
+						on:upload={handleImageUpload}
 					/>
 				</div>
 				

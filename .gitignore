@@ -169,3 +169,7 @@ out/
 test-results/
 playwright-report/
 playwright/.cache/
+
+# Uploaded product images (ignore files but keep directory structure)
+static/uploads/products/*
+!static/uploads/products/.gitkeep

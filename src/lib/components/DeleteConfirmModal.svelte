@@ -5,15 +5,12 @@
 	export let message = 'Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.';
 	export let confirmText = 'Excluir';
 	export let cancelText = 'Cancelar';
+	export let loading = false;
 	
 	const dispatch = createEventDispatcher();
 	
-	let loading = false;
-	
 	function handleConfirm() {
-		loading = true;
 		dispatch('confirm');
-		loading = false;
 	}
 	
 	function handleCancel() {
@@ -38,27 +35,46 @@
 	<!-- svelte-ignore a11y-click-events-have-key-events -->
 	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 	<div 
-		class="relative top-20 mx-auto p-5 border w-11/12 md:w-96 shadow-lg rounded-md bg-white" 
+		class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/3 lg:w-1/4 shadow-lg rounded-md bg-white" 
 		on:click|stopPropagation
 		on:keydown|stopPropagation
 		tabindex="-1"
 		role="document"
 	>
 		<!-- Modal Header -->
-		<div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
-			<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-			</svg>
+		<div class="flex items-center justify-between pb-4 border-b">
+			<h3 id="modal-title" class="text-lg font-medium text-gray-900">{title}</h3>
+			<!-- svelte-ignore a11y_consider_explicit_label -->
+			<button
+				on:click={handleCancel}
+				class="text-gray-400 hover:text-gray-600 transition-colors"
+				disabled={loading}
+			>
+				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
 		</div>
 		
 		<!-- Modal Body -->
-		<div class="text-center">
-			<h3 id="modal-title" class="text-lg font-medium text-gray-900 mb-2">{title}</h3>
-			<p class="text-sm text-gray-500 mb-6">{message}</p>
+		<div class="mt-4">
+			<div class="flex items-center space-x-4">
+				<!-- Warning Icon -->
+				<div class="flex-shrink-0">
+					<svg class="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 15.5c-.77.833.192 2.5 1.732 2.5z" />
+					</svg>
+				</div>
+				
+				<!-- Message -->
+				<div class="flex-1">
+					<p class="text-sm text-gray-600">{message}</p>
+				</div>
+			</div>
 		</div>
 		
 		<!-- Modal Footer -->
-		<div class="flex items-center justify-center space-x-3">
+		<div class="flex items-center justify-end space-x-3 pt-6 border-t mt-6">
 			<button
 				type="button"
 				on:click={handleCancel}
@@ -70,7 +86,7 @@
 			<button
 				type="button"
 				on:click={handleConfirm}
-				class="btn btn-danger"
+				class="btn bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
 				disabled={loading}
 			>
 				{#if loading}
