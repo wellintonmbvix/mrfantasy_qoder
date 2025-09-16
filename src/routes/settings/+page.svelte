@@ -9,7 +9,8 @@
 	let formData = {
 		databaseVersion: 1,
 		receiptInBobina: false,
-		inhibitSurcharge: false
+		inhibitSurcharge: false,
+		allowNegativeStock: false
 	};
 
 	type FormDataType = typeof formData;
@@ -19,7 +20,8 @@
 		formData = {
 			databaseVersion: data.settings.databaseVersion || 1,
 			receiptInBobina: data.settings.receiptInBobina || false,
-			inhibitSurcharge: data.settings.inhibitSurcharge || false
+			inhibitSurcharge: data.settings.inhibitSurcharge || false,
+			allowNegativeStock: data.settings.allowNegativeStock || false
 		};
 	}
 
@@ -30,7 +32,8 @@
 		formData = {
 			databaseVersion: form.settings.databaseVersion || 1,
 			receiptInBobina: form.settings.receiptInBobina || false,
-			inhibitSurcharge: form.settings.inhibitSurcharge || false
+			inhibitSurcharge: form.settings.inhibitSurcharge || false,
+			allowNegativeStock: form.settings.allowNegativeStock || false
 		};
 	}
 
@@ -135,6 +138,25 @@
 						Impede a aplicação de acréscimos automáticos em pedidos e aluguéis
 					</p>
 				</div>
+
+				<!-- Permitir Estoque Negativo -->
+				<div class="md:col-span-2">
+					<div class="flex items-center">
+						<input
+							type="checkbox"
+							id="allowNegativeStock"
+							name="allowNegativeStock"
+							bind:checked={formData.allowNegativeStock}
+							class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+						/>
+						<label for="allowNegativeStock" class="ml-2 block text-sm font-medium text-gray-700">
+							Permitir Estoque Negativo
+						</label>
+					</div>
+					<p class="mt-1 text-sm text-gray-500">
+						Permite a venda ou aluguel de itens mesmo com estoque zero ou negativo
+					</p>
+				</div>
 			</div>
 
 			<!-- Botões -->
@@ -167,6 +189,7 @@
 			<li><strong>Versão do Banco de Dados:</strong> Controla a compatibilidade entre diferentes versões do sistema</li>
 			<li><strong>Comprovante em Bobina:</strong> Ajusta o formato de impressão para impressoras térmicas de bobina</li>
 			<li><strong>Inibir Acréscimo:</strong> Previne a cobrança automática de taxas extras em transações</li>
+			<li><strong>Permitir Estoque Negativo:</strong> Habilita vendas e aluguéis mesmo quando o estoque está zerado ou negativo</li>
 			<li><strong>Acesso:</strong> Estas configurações só podem ser alteradas por Administradores e Gerentes</li>
 		</ul>
 	</div>

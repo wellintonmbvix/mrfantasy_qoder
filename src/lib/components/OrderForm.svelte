@@ -3,6 +3,7 @@
 	import { customers } from '$lib/stores/customers.js';
 	import { products } from '$lib/stores/products.js';
 	import { employees } from '$lib/stores/employees.js';
+	import { notificationStore } from '$lib/stores/notifications.js';
 	import { calculateDiscount, applyDiscount, distributeOrderDiscount, calculateSurcharge, applySurcharge, distributeOrderSurcharge } from '$lib/utils/validation.js';
 	
 	const dispatch = createEventDispatcher();
@@ -197,11 +198,47 @@
 	}
 	
 	function addProduct(product: any) {
+		const allowNegativeStock = settings?.allowNegativeStock || false;
 		const existingIndex = orderItems.findIndex(item => item.productId === product.id);
 		
 		if (existingIndex >= 0) {
-			orderItems[existingIndex].quantity += 1;
+			// If adding to existing item, check if new quantity would exceed stock
+			const newQuantity = orderItems[existingIndex].quantity + 1;
+			if (newQuantity > product.stockQuantity && !allowNegativeStock) {
+				notificationStore.error(
+					`Não é possível aumentar a quantidade de ${product.name}. Estoque atual: ${product.stockQuantity}. Para permitir estoque negativo, habilite a opção em Configurações.`,
+					8000
+				);
+				return;
+			}
+			
+			// Show warning if stock will be negative but allowed
+			if (newQuantity > product.stockQuantity && allowNegativeStock) {
+				notificationStore.warning(
+					`Atenção: Aumentando quantidade de ${product.name}. Estoque atual: ${product.stockQuantity}. Permitido por configuração.`,
+					6000
+				);
+			}
+			
+			orderItems[existingIndex].quantity = newQuantity;
 		} else {
+			// Adding new product - check if stock is available
+			if (product.stockQuantity <= 0 && !allowNegativeStock) {
+				notificationStore.error(
+					`Não é possível adicionar ${product.name}. Estoque atual: ${product.stockQuantity}. Para permitir estoque negativo, habilite a opção em Configurações.`,
+					8000
+				);
+				return; // Prevent adding the product
+			}
+			
+			// Show warning if adding product with zero/negative stock but allowed
+			if (product.stockQuantity <= 0 && allowNegativeStock) {
+				notificationStore.warning(
+					`Atenção: ${product.name} possui estoque ${product.stockQuantity}. Adição permitida por configuração.`,
+					6000
+				);
+			}
+			
 			// Se o produto está disponível para ambos (venda e aluguel), usar o tipo aluguel como padrão
 			// Se está disponível apenas para um, usar o tipo disponível
 			let defaultItemType: 'RENTAL' | 'SALE';
@@ -239,9 +276,31 @@
 	function updateItemQuantity(index: number, quantity: number) {
 		if (quantity <= 0) {
 			removeItem(index);
-		} else {
-			orderItems[index].quantity = quantity;
+			return;
 		}
+		
+		const item = orderItems[index];
+		if (item.product && quantity > item.product.stockQuantity) {
+			const allowNegativeStock = settings?.allowNegativeStock || false;
+			
+			if (!allowNegativeStock) {
+				notificationStore.error(
+					`Quantidade não pode exceder o estoque de ${item.product.name}. Estoque atual: ${item.product.stockQuantity}.`,
+					8000
+				);
+				// Manter a quantidade anterior
+				return;
+			} else {
+				if (item.product.stockQuantity <= 0) {
+					notificationStore.warning(
+						`Atenção: ${item.product.name} possui estoque ${item.product.stockQuantity}. Quantidade permitida por configuração.`,
+						6000
+					);
+				}
+			}
+		}
+		
+		orderItems[index].quantity = quantity;
 	}
 	
 	function updateItemPrice(index: number, price: number) {
@@ -418,8 +477,26 @@
 		// Validate stock availability
 		for (const item of orderItems) {
 			if (item.product && item.quantity > item.product.stockQuantity) {
-				errors.items = `Estoque insuficiente para ${item.product.name}`;
-				break;
+				// Check if negative stock is allowed
+				const allowNegativeStock = settings?.allowNegativeStock || false;
+				
+				if (!allowNegativeStock) {
+					// Show toast notification for blocked stock
+					notificationStore.error(
+						`Estoque insuficiente para ${item.product.name}. Estoque atual: ${item.product.stockQuantity}. Para permitir estoque negativo, habilite a opção em Configurações.`,
+						8000
+					);
+					errors.items = `Estoque insuficiente para ${item.product.name}`;
+					break;
+				} else {
+					// Allow negative stock but show warning
+					if (item.product.stockQuantity <= 0) {
+						notificationStore.warning(
+							`Atenção: ${item.product.name} possui estoque ${item.product.stockQuantity}. Venda/aluguel permitida por configuração.`,
+							6000
+						);
+					}
+				}
 			}
 			
 			// Validate item type availability
@@ -596,8 +673,7 @@
 										<button
 											type="button"
 											on:click={() => addProduct(product)}
-											class="w-full text-left px-3 py-2 hover:bg-gray-100 focus:bg-gray-100"
-											disabled={product.stockQuantity === 0}
+											class="w-full text-left px-3 py-2 hover:bg-gray-100 focus:bg-gray-100 {product.stockQuantity <= 0 && !(settings?.allowNegativeStock) ? 'opacity-50 cursor-not-allowed' : ''}"
 										>
 											<div class="flex justify-between">
 												<div>
@@ -652,7 +728,7 @@
 											<input
 												type="number"
 												min="1"
-												max={item.product?.stockQuantity}
+												max={!(settings?.allowNegativeStock) ? item.product?.stockQuantity : undefined}
 												value={item.quantity}
 												on:change={(e) => {
 													const target = e.target as HTMLInputElement;

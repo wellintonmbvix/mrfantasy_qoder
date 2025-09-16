@@ -345,7 +345,8 @@ export const settingsSchema = z.object({
 		.min(1, 'Versão do banco de dados deve ser pelo menos 1')
 		.max(999999, 'Versão do banco de dados muito alta'),
 	receiptInBobina: z.boolean(),
-	inhibitSurcharge: z.boolean()
+	inhibitSurcharge: z.boolean(),
+	allowNegativeStock: z.boolean()
 });
 
 // Phone number formatting utility

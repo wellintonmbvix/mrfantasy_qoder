@@ -360,6 +360,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			totalAmount = applySurcharge(totalAmount, validatedData.surchargeType, validatedData.surchargeValue);
 		}
 		
+		// Check system settings for negative stock allowance
+		const settings = await prisma.settings.findFirst();
+		const allowNegativeStock = settings?.allowNegativeStock || false;
+		
 		// Validate products and stock
 		for (const item of processedItems) {
 			const product = await prisma.product.findUnique({
@@ -373,9 +377,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				);
 			}
 
-			if (product.stockQuantity < item.quantity) {
+			if (!allowNegativeStock && product.stockQuantity < item.quantity) {
 				return json(
-					{ error: `Estoque insuficiente para ${product.name}` },
+					{ error: `Estoque insuficiente para ${product.name}. Estoque atual: ${product.stockQuantity}` },
 					{ status: 400 }
 				);
 			}

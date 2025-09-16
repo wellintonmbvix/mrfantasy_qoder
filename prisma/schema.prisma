@@ -250,6 +250,7 @@ model Settings {
   databaseVersion        Int      @map("database_version")
   receiptInBobina        Boolean  @default(false) @map("receipt_in_bobina")
   inhibitSurcharge       Boolean  @default(false) @map("inhibit_surcharge")
+  allowNegativeStock     Boolean  @default(false) @map("allow_negative_stock")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 

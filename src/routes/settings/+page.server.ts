@@ -46,7 +46,8 @@ export const actions: Actions = {
 			const data = {
 				databaseVersion: parseInt(formData.get('databaseVersion') as string, 10),
 				receiptInBobina: formData.get('receiptInBobina') === 'on',
-				inhibitSurcharge: formData.get('inhibitSurcharge') === 'on'
+				inhibitSurcharge: formData.get('inhibitSurcharge') === 'on',
+				allowNegativeStock: formData.get('allowNegativeStock') === 'on'
 			};
 
 			// Validar dados
