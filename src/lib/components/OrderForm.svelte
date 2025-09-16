@@ -67,6 +67,14 @@
 	let settings: any = null;
 	let surchargeEnabled = false;
 	
+	// Dropdown references for click outside detection
+	let productDropdownRef: HTMLElement;
+	let customerDropdownRef: HTMLElement;
+	
+	// Selected indices for keyboard navigation
+	let productSelectedIndex = -1;
+	let customerSelectedIndex = -1;
+	
 	// Reactive declarations
 	let customersData: any;
 	let employeesData: any;
@@ -125,6 +133,48 @@
 	
 	onMount(() => {
 		loadInitialData();
+		
+		// Add global click listener to close dropdowns when clicking outside
+		function handleClickOutside(event: MouseEvent) {
+			const target = event.target as Element;
+			
+			// Check if clicked element is inside any dropdown or its trigger
+			const isInsideProductDropdown = productDropdownRef && productDropdownRef.contains(target);
+			const isInsideCustomerDropdown = customerDropdownRef && customerDropdownRef.contains(target);
+			
+			// Close product dropdown if click is outside and dropdown is open
+			if (showProductDropdown && !isInsideProductDropdown) {
+				showProductDropdown = false;
+				productSelectedIndex = -1;
+			}
+			
+			// Close customer dropdown if click is outside and dropdown is open
+			if (showCustomerDropdown && !isInsideCustomerDropdown) {
+				showCustomerDropdown = false;
+				customerSelectedIndex = -1;
+			}
+		}
+		
+		// Add global keydown listener to close dropdowns on ESC
+		function handleKeydown(event: KeyboardEvent) {
+			if (event.key === 'Escape') {
+				// Close dropdowns first before allowing modal to close
+				if (showProductDropdown || showCustomerDropdown) {
+					showProductDropdown = false;
+					showCustomerDropdown = false;
+					event.stopPropagation(); // Prevent modal from closing
+				}
+			}
+		}
+		
+		document.addEventListener('click', handleClickOutside, true); // Use capture phase
+		document.addEventListener('keydown', handleKeydown, true); // Use capture phase
+		
+		// Cleanup function
+		return () => {
+			document.removeEventListener('click', handleClickOutside, true);
+			document.removeEventListener('keydown', handleKeydown, true);
+		};
 	});
 	
 	async function loadInitialData() {
@@ -172,29 +222,40 @@
 	}
 	
 	async function searchCustomers() {
-		if (customerSearch.length < 2) return;
+		if (customerSearch.length < 2) {
+			showCustomerDropdown = false;
+			customerSelectedIndex = -1;
+			return;
+		}
 		
 		searchingCustomers = true;
 		await customers.fetch({ search: customerSearch, limit: 20 });
 		customersList = customersData.customers;
 		searchingCustomers = false;
 		showCustomerDropdown = true;
+		customerSelectedIndex = -1;
 	}
 	
 	async function searchProducts() {
-		if (productSearch.length < 2) return;
+		if (productSearch.length < 2) {
+			showProductDropdown = false;
+			productSelectedIndex = -1;
+			return;
+		}
 		
 		searchingProducts = true;
 		await products.fetchProducts({ search: productSearch, limit: 20 });
 		productsList = productsData.products;
 		searchingProducts = false;
 		showProductDropdown = true;
+		productSelectedIndex = -1;
 	}
 	
 	function selectCustomer(customer: any) {
 		selectedCustomerId = customer.id.toString();
 		customerSearch = customer.name;
 		showCustomerDropdown = false;
+		customerSelectedIndex = -1;
 	}
 	
 	function addProduct(product: any) {
@@ -267,6 +328,7 @@
 		
 		productSearch = '';
 		showProductDropdown = false;
+		productSelectedIndex = -1;
 	}
 	
 	function removeItem(index: number) {
@@ -599,7 +661,25 @@
 	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 	<div 
 		class="relative top-2 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-5/6 xl:w-4/5 shadow-lg rounded-md bg-white max-h-screen overflow-y-auto" 
-		on:click|stopPropagation
+		on:click={(e) => {
+			// Handle clicks inside modal - close dropdowns if clicking outside them
+			const target = e.target as Element;
+			const isInsideProductDropdown = productDropdownRef && productDropdownRef.contains(target);
+			const isInsideCustomerDropdown = customerDropdownRef && customerDropdownRef.contains(target);
+			
+			if (showProductDropdown && !isInsideProductDropdown) {
+				showProductDropdown = false;
+				productSelectedIndex = -1;
+			}
+			
+			if (showCustomerDropdown && !isInsideCustomerDropdown) {
+				showCustomerDropdown = false;
+				customerSelectedIndex = -1;
+			}
+			
+			// Stop propagation to prevent modal from closing
+			e.stopPropagation();
+		}}
 		on:keydown|stopPropagation
 		tabindex="-1"
 		role="document"
@@ -658,22 +738,41 @@
 					<!-- Product Search -->
 					<div class="bg-gray-50 p-4 rounded-lg">
 						<h4 class="text-md font-medium text-gray-900 mb-4">Adicionar Produtos</h4>
-						<div class="relative">
+						<div class="relative" bind:this={productDropdownRef}>
 							<input
 								type="text"
 								bind:value={productSearch}
 								on:input={searchProducts}
-								on:focus={() => showProductDropdown = true}
+								on:focus={() => {
+									showProductDropdown = true;
+									productSelectedIndex = -1;
+								}}
+								on:keydown={(e) => {
+									if (e.key === 'Escape') {
+										showProductDropdown = false;
+										productSelectedIndex = -1;
+										e.stopPropagation();
+									} else if (e.key === 'ArrowDown' && showProductDropdown) {
+										e.preventDefault();
+										productSelectedIndex = Math.min(productSelectedIndex + 1, productsList.length - 1);
+									} else if (e.key === 'ArrowUp' && showProductDropdown) {
+										e.preventDefault();
+										productSelectedIndex = Math.max(productSelectedIndex - 1, -1);
+									} else if (e.key === 'Enter' && showProductDropdown && productSelectedIndex >= 0) {
+										e.preventDefault();
+										addProduct(productsList[productSelectedIndex]);
+									}
+								}}
 								class="form-input w-full"
 								placeholder="Buscar produto por nome ou SKU..."
 							/>
 							{#if showProductDropdown && productsList.length > 0}
 								<div class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
-									{#each productsList as product}
+									{#each productsList as product, index}
 										<button
 											type="button"
 											on:click={() => addProduct(product)}
-											class="w-full text-left px-3 py-2 hover:bg-gray-100 focus:bg-gray-100 {product.stockQuantity <= 0 && !(settings?.allowNegativeStock) ? 'opacity-50 cursor-not-allowed' : ''}"
+											class="w-full text-left px-3 py-2 hover:bg-gray-100 focus:bg-gray-100 {productSelectedIndex === index ? 'bg-blue-50 border-l-4 border-blue-500' : ''} {product.stockQuantity <= 0 && !(settings?.allowNegativeStock) ? 'opacity-50 cursor-not-allowed' : ''}"
 										>
 											<div class="flex justify-between">
 												<div>
@@ -1059,24 +1158,43 @@
 				<!-- Order Information Tab -->
 				<div class="space-y-6">
 					<!-- Customer Search -->
-					<div class="relative">
+					<div class="relative" bind:this={customerDropdownRef}>
 						<label for="customer" class="form-label">Cliente {hasRentalItems ? '*' : ''}</label>
 						<input
 							type="text"
 							bind:value={customerSearch}
 							on:input={searchCustomers}
-							on:focus={() => showCustomerDropdown = true}
+							on:focus={() => {
+								showCustomerDropdown = true;
+								customerSelectedIndex = -1;
+							}}
+							on:keydown={(e) => {
+								if (e.key === 'Escape') {
+									showCustomerDropdown = false;
+									customerSelectedIndex = -1;
+									e.stopPropagation();
+								} else if (e.key === 'ArrowDown' && showCustomerDropdown) {
+									e.preventDefault();
+									customerSelectedIndex = Math.min(customerSelectedIndex + 1, customersList.length - 1);
+								} else if (e.key === 'ArrowUp' && showCustomerDropdown) {
+									e.preventDefault();
+									customerSelectedIndex = Math.max(customerSelectedIndex - 1, -1);
+								} else if (e.key === 'Enter' && showCustomerDropdown && customerSelectedIndex >= 0) {
+									e.preventDefault();
+									selectCustomer(customersList[customerSelectedIndex]);
+								}
+							}}
 							class="form-input {errors.customer ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}"
 							placeholder="Buscar cliente por nome ou email..."
 							required={hasRentalItems}
 						/>
 						{#if showCustomerDropdown && customersList.length > 0}
 							<div class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
-								{#each customersList as customer}
+								{#each customersList as customer, index}
 									<button
 										type="button"
 										on:click={() => selectCustomer(customer)}
-										class="w-full text-left px-3 py-2 hover:bg-gray-100 focus:bg-gray-100"
+										class="w-full text-left px-3 py-2 hover:bg-gray-100 focus:bg-gray-100 {customerSelectedIndex === index ? 'bg-blue-50 border-l-4 border-blue-500' : ''}"
 									>
 										<div class="font-medium">{customer.name}</div>
 										<div class="text-sm text-gray-500">{customer.email}</div>
