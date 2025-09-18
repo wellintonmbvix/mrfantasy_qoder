@@ -16,6 +16,9 @@
 		auth.setUser(null);
 	}
 	
+	// Mobile menu state
+	let mobileMenuOpen = false;
+	
 	// Reactive declarations
 	let user: any;
 	let isAuthPage: boolean;
@@ -167,12 +170,54 @@
 			<div class="bg-primary-800 px-4 py-3 flex items-center justify-between">
 				<h1 class="text-white text-lg font-bold">Mr. Fantasy</h1>
 				<!-- svelte-ignore a11y_consider_explicit_label -->
-				<button class="text-white">
+				<button class="text-white" on:click={() => mobileMenuOpen = !mobileMenuOpen}>
 					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 					</svg>
 				</button>
 			</div>
+			
+			<!-- Mobile menu -->
+			{#if mobileMenuOpen}
+				<div class="bg-primary-800 border-t border-primary-700">
+					<nav class="px-2 pt-2 pb-4 space-y-1">
+						{#each allNavigationItems as item}
+							<a
+								href={item.href}
+								on:click={() => mobileMenuOpen = false}
+								class="group flex items-center px-2 py-2 text-base leading-5 font-medium rounded-md transition ease-in-out duration-150 {$page.url.pathname.startsWith(item.href) 
+									? 'text-white bg-primary-900' 
+									: 'text-primary-200 hover:text-white hover:bg-primary-700'}"
+							>
+								<svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={item.icon} />
+								</svg>
+								{item.name}
+							</a>
+						{/each}
+					</nav>
+					
+					<!-- User menu mobile -->
+					<div class="flex-shrink-0 flex bg-primary-700 p-4 border-t border-primary-600">
+						<div class="flex items-center">
+							<div>
+								<p class="text-sm leading-5 font-medium text-white">{user?.username}</p>
+								<p class="text-xs leading-4 text-primary-300">{user?.role}</p>
+							</div>
+							<!-- svelte-ignore a11y_consider_explicit_label -->
+							<button
+								on:click={logout}
+								class="ml-auto text-primary-200 hover:text-white transition-colors"
+								title="Sair"
+							>
+								<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+								</svg>
+							</button>
+						</div>
+					</div>
+				</div>
+			{/if}
 		</div>
 
 		<!-- Main content -->
