@@ -5,8 +5,7 @@
 	let notifications: any[] = [];
 
 	$: {
-		notifications = $notificationStore || [];
-		console.log('📄 NotificationContainer - Notificações atuais:', notifications);
+		notifications = $notificationStore || [];		
 	}
 
 	function closeNotification(id: string) {

@@ -10,9 +10,7 @@ export const POST: RequestHandler = async ({ cookies }) => {
 		secure: process.env.NODE_ENV === 'production',
 		sameSite: 'lax',
 		maxAge: 0 // Expire immediately
-	});
-	
-	console.log('User logged out, cookie cleared'); // Debug log
+	});		
 	
 	return json({ success: true });
 };

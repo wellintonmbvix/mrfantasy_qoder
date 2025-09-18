@@ -18,30 +18,21 @@ export interface UserPayload {
 
 export class AuthService {
 	static async login(credentials: LoginCredentials) {
-		const { email, password } = credentials;
-
-		console.log('Attempting to find user with email:', email); // Debug log
+		const { email, password } = credentials;		
 
 		// Find user by email
 		const user = await prisma.user.findUnique({
 			where: { email, active: true }
 		});
 
-		if (!user) {
-			console.log('User not found or inactive for email:', email); // Debug log
+		if (!user) {			
 			throw new Error('Credenciais inválidas');
-		}
-
-		console.log('User found, verifying password...'); // Debug log
-		console.log('Stored password hash length:', user.passwordHash?.length || 0); // Debug log
-		console.log('Input password length:', password?.length || 0); // Debug log
+		}						
 
 		// Verify password
-		const isValidPassword = await bcrypt.compare(password, user.passwordHash);
-		console.log('Password verification result:', isValidPassword); // Debug log
+		const isValidPassword = await bcrypt.compare(password, user.passwordHash);		
 		
-		if (!isValidPassword) {
-			console.log('Password verification failed for user:', email); // Debug log
+		if (!isValidPassword) {			
 			throw new Error('Credenciais inválidas');
 		}
 
@@ -53,8 +44,7 @@ export class AuthService {
 			role: user.role
 		};
 
-		const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
-		console.log('JWT token generated successfully'); // Debug log
+		const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });		
 
 		return {
 			token,
