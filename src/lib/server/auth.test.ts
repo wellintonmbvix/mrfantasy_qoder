@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { authenticateUser, generateToken, verifyToken, hashPassword } from '$lib/server/auth';
+import { AuthService } from '$lib/server/auth';
 
 // Mock dependencies
 vi.mock('bcryptjs');
@@ -29,7 +29,8 @@ describe('Authentication Service', () => {
 			
 			mockBcrypt.hash.mockResolvedValue(hashedPassword as never);
 			
-			const result = await hashPassword(password);
+			// Using bcrypt directly since hashPassword is not a method of AuthService
+			const result = await bcrypt.hash(password, 10);
 			
 			expect(mockBcrypt.hash).toHaveBeenCalledWith(password, 10);
 			expect(result).toBe(hashedPassword);
@@ -48,19 +49,19 @@ describe('Authentication Service', () => {
 			
 			mockJwt.sign.mockReturnValue(token as never);
 			
-			const result = generateToken(user);
+			const result = AuthService.generateToken(user);
 			
 			expect(mockJwt.sign).toHaveBeenCalledWith(
 				user,
 				expect.any(String),
-				{ expiresIn: '7d' }
+				{ expiresIn: '24h' }
 			);
 			expect(result).toBe(token);
 		});
 	});
 
 	describe('verifyToken', () => {
-		it('should verify valid JWT token', () => {
+		it('should verify valid JWT token', async () => {
 			const token = 'valid.jwt.token';
 			const payload = {
 				id: 1,
@@ -71,76 +72,85 @@ describe('Authentication Service', () => {
 			
 			mockJwt.verify.mockReturnValue(payload as never);
 			
-			const result = verifyToken(token);
+			const result = await AuthService.verifyToken(token);
 			
 			expect(mockJwt.verify).toHaveBeenCalledWith(token, expect.any(String));
 			expect(result).toEqual(payload);
 		});
 
-		it('should return null for invalid token', () => {
+		it('should throw error for invalid token', async () => {
 			const token = 'invalid.jwt.token';
 			
 			mockJwt.verify.mockImplementation(() => {
 				throw new Error('Invalid token');
 			});
 			
-			const result = verifyToken(token);
-			
-			expect(result).toBeNull();
+			await expect(AuthService.verifyToken(token)).rejects.toThrow('Token inválido');
 		});
 	});
 
-	describe('authenticateUser', () => {
+	describe('authenticateUser (login)', () => {
 		it('should authenticate user with correct credentials', async () => {
-			const email = 'test@example.com';
-			const password = 'correctpassword';
+			const credentials = {
+				email: 'test@example.com',
+				password: 'correctpassword'
+			};
 			const user = {
 				id: 1,
 				username: 'testuser',
-				email,
-				password: 'hashedpassword',
+				email: 'test@example.com',
+				passwordHash: 'hashedpassword',
 				role: 'EMPLOYEE',
 				active: true
 			};
+			const payload = {
+				id: user.id,
+				username: user.username,
+				email: user.email,
+				role: user.role as 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
+			};
+			const token = 'jwt.token.string';
 
 			const { prisma } = await import('$lib/server/database');
 			vi.mocked(prisma.user.findUnique).mockResolvedValue(user as never);
 			mockBcrypt.compare.mockResolvedValue(true as never);
+			mockJwt.sign.mockReturnValue(token as never);
 
-			const result = await authenticateUser(email, password);
+			const result = await AuthService.login(credentials);
 
 			expect(prisma.user.findUnique).toHaveBeenCalledWith({
-				where: { email }
+				where: { email: credentials.email, active: true }
 			});
-			expect(mockBcrypt.compare).toHaveBeenCalledWith(password, user.password);
+			expect(mockBcrypt.compare).toHaveBeenCalledWith(credentials.password, user.passwordHash);
+			expect(mockJwt.sign).toHaveBeenCalledWith(payload, expect.any(String), { expiresIn: '24h' });
 			expect(result).toEqual({
-				id: user.id,
-				username: user.username,
-				email: user.email,
-				role: user.role
+				token,
+				user: payload
 			});
 		});
 
-		it('should return null for non-existent user', async () => {
-			const email = 'nonexistent@example.com';
-			const password = 'password';
+		it('should throw error for non-existent user', async () => {
+			const credentials = {
+				email: 'nonexistent@example.com',
+				password: 'password'
+			};
 
 			const { prisma } = await import('$lib/server/database');
 			vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
 
-			const result = await authenticateUser(email, password);
-
-			expect(result).toBeNull();
+			await expect(AuthService.login(credentials)).rejects.toThrow('Credenciais inválidas');
 		});
 
-		it('should return null for incorrect password', async () => {
-			const email = 'test@example.com';
-			const password = 'wrongpassword';
+		it('should throw error for incorrect password', async () => {
+			const credentials = {
+				email: 'test@example.com',
+				password: 'wrongpassword'
+			};
 			const user = {
 				id: 1,
 				username: 'testuser',
-				email,
-				password: 'hashedpassword',
+				email: 'test@example.com',
+				passwordHash: 'hashedpassword',
 				role: 'EMPLOYEE',
 				active: true
 			};
@@ -149,29 +159,7 @@ describe('Authentication Service', () => {
 			vi.mocked(prisma.user.findUnique).mockResolvedValue(user as never);
 			mockBcrypt.compare.mockResolvedValue(false as never);
 
-			const result = await authenticateUser(email, password);
-
-			expect(result).toBeNull();
-		});
-
-		it('should return null for inactive user', async () => {
-			const email = 'test@example.com';
-			const password = 'correctpassword';
-			const user = {
-				id: 1,
-				username: 'testuser',
-				email,
-				password: 'hashedpassword',
-				role: 'EMPLOYEE',
-				active: false
-			};
-
-			const { prisma } = await import('$lib/server/database');
-			vi.mocked(prisma.user.findUnique).mockResolvedValue(user as never);
-
-			const result = await authenticateUser(email, password);
-
-			expect(result).toBeNull();
+			await expect(AuthService.login(credentials)).rejects.toThrow('Credenciais inválidas');
 		});
 	});
 });

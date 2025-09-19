@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GET, POST } from '$routes/api/customers/+server';
+import { GET, POST } from './+server';
 
 // Mock dependencies
 vi.mock('$lib/server/database', () => ({
