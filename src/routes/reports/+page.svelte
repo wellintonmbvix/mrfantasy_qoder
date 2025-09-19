@@ -343,8 +343,43 @@
 
 	// Funções de utilidade
 	function formatDate(dateString: string) {
-		return new Date(dateString).toLocaleDateString('pt-BR');
+		if (!dateString) return '';
+		
+		// Para datas no formato YYYY-MM-DD, parsear manualmente para evitar problemas de fuso horário
+		if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+			const [year, month, day] = dateString.split('-');
+			return `${day}/${month}/${year}`;
+		}
+		
+		// Para outros formatos, usar uma abordagem mais robusta
+		try {
+			const date = new Date(dateString);
+			if (isNaN(date.getTime())) {
+				return 'Data inválida';
+			}
+			
+			// Usar o formato UTC para evitar deslocamentos de fuso horário
+			const day = String(date.getUTCDate()).padStart(2, '0');
+			const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+			const year = date.getUTCFullYear();
+			
+			return `${day}/${month}/${year}`;
+		} catch (error) {
+			console.error('Erro ao formatar data:', error, dateString);
+			return 'Data inválida';
+		}
 	}
+	
+	// Testes para verificar se a função está funcionando corretamente
+	// (Esses testes podem ser removidos após a confirmação)
+	function testFormatDate() {
+		console.log('Teste 1:', formatDate('2025-09-15')); // Deve mostrar 15/09/2025
+		console.log('Teste 2:', formatDate('2025-01-01')); // Deve mostrar 01/01/2025
+		console.log('Teste 3:', formatDate('2025-12-31')); // Deve mostrar 31/12/2025
+	}
+	
+	// Executar os testes (pode ser removido após a confirmação)
+	testFormatDate();
 
 	function formatCurrency(value: number) {
 		return new Intl.NumberFormat('pt-BR', {
@@ -370,6 +405,7 @@
 		}
 	}
 
+	
 	function getRentalStatusLabel(status: string) {
 		switch (status) {
 			case 'not_taken':
@@ -846,7 +882,7 @@
 								<div class="ml-5 w-0 flex-1">
 									<dl>
 										<dt class="text-sm font-medium text-gray-500 truncate">Valor Total</dt>
-										<dd class="text-lg font-medium text-gray-900">{formatCurrency(orderReportState.summary.totalAmount)}</dd>
+										<dd class="text-lg font-medium text-gray-900 text-right">{formatCurrency(orderReportState.summary.totalAmount)}</dd>
 									</dl>
 								</div>
 							</div>
@@ -858,7 +894,7 @@
 							<div class="flex items-center">
 								<div class="flex-shrink-0">
 									<svg class="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
 									</svg>
 								</div>
 								<div class="ml-5 w-0 flex-1">
@@ -882,7 +918,7 @@
 								<div class="ml-5 w-0 flex-1">
 									<dl>
 										<dt class="text-sm font-medium text-gray-500 truncate">Total Desconto</dt>
-										<dd class="text-lg font-medium text-gray-900">{formatCurrency(orderReportState.summary.totalDiscount)}</dd>
+										<dd class="text-lg font-medium text-gray-900 text-right">{formatCurrency(orderReportState.summary.totalDiscount)}</dd>
 									</dl>
 								</div>
 							</div>
@@ -919,8 +955,8 @@
 									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
 									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Atendente</th>
 									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Itens</th>
-									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+									<th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Itens</th>
+									<th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
 								</tr>
 							</thead>
 							<tbody class="bg-white divide-y divide-gray-200">
@@ -939,12 +975,12 @@
 											{order.attendant?.name || '-'}
 										</td>
 										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-											{order.status}
+											{getOrderStatusLabel(order.status)}
 										</td>
-										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
 											{order.totalQuantity}
 										</td>
-										<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+										<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
 											{formatCurrency(order.totalAmount)}
 										</td>
 									</tr>
