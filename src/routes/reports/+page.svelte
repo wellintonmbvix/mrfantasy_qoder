@@ -2,13 +2,15 @@
 	import { onMount } from 'svelte';
 	import { orderReportStore, orderReportActions } from '$lib/stores/orderReport.js';
 	import { notificationStore } from '$lib/stores/notifications.js';
+	import { products } from '$lib/stores/products.js';
+	import { customers } from '$lib/stores/customers.js';
 
 	// Estado das abas
 	let activeTab: 'orders' | 'rental' = 'orders';
 
 	// Estados do relatório de pedidos
 	let orderReportState: any;
-	let customers: any[] = [];
+	let customersList: any[] = [];
 	let attendants: any[] = [];
 	
 	// Variáveis locais para filtros de pedidos
@@ -16,6 +18,11 @@
 	let orderDateTo = '';
 	let orderCustomerId = '';
 	let orderAttendantId = '';
+	let customerSearch = '';
+	let showCustomerDropdown = false;
+	let customerSelectedIndex = -1;
+	let customerDropdownRef: HTMLElement;
+	let searchingCustomers = false;
 
 	// Estados do relatório de itens de aluguel
 	let rentalLoading = false;
@@ -35,7 +42,13 @@
 		itemStatus: 'not_taken'
 	};
 	let rentalShowFilters = true;
-	let products: any[] = [];
+	let productsData: any;
+	let productsList: any[] = [];
+	let searchingProducts = false;
+	let productSearch = '';
+	let showProductDropdown = false;
+	let productSelectedIndex = -1;
+	let productDropdownRef: HTMLElement;
 
 	// Subscrever ao store de relatórios de pedidos
 	orderReportStore.subscribe(state => {
@@ -53,11 +66,61 @@
 		await loadCustomers();
 		await loadAttendants();
 		await loadProducts();
+		
+		// Inicializar filtros de data com a data atual
+		const today = new Date();
+		const todayString = today.toISOString().split('T')[0];
+		orderDateFrom = todayString;
+		orderDateTo = todayString;
+		orderReportActions.setFilters({ dateFrom: orderDateFrom, dateTo: orderDateTo });
+		
 		if (activeTab === 'orders') {
 			await orderReportActions.loadReport();
 		} else {
 			await loadRentalReport();
 		}
+		
+		// Add global click listener to close dropdowns when clicking outside
+		function handleClickOutside(event: MouseEvent) {
+			const target = event.target as Element;
+			
+			// Check if clicked element is inside product dropdown or its trigger
+			const isInsideProductDropdown = productDropdownRef && productDropdownRef.contains(target);
+			const isInsideCustomerDropdown = customerDropdownRef && customerDropdownRef.contains(target);
+			
+			// Close product dropdown if click is outside and dropdown is open
+			if (showProductDropdown && !isInsideProductDropdown) {
+				showProductDropdown = false;
+				productSelectedIndex = -1;
+			}
+			
+			// Close customer dropdown if click is outside and dropdown is open
+			if (showCustomerDropdown && !isInsideCustomerDropdown) {
+				showCustomerDropdown = false;
+				customerSelectedIndex = -1;
+			}
+		}
+		
+		// Add global keydown listener to close dropdowns on ESC
+		function handleKeydown(event: KeyboardEvent) {
+			if (event.key === 'Escape') {
+				// Close dropdowns first before allowing modal to close
+				if (showProductDropdown || showCustomerDropdown) {
+					showProductDropdown = false;
+					showCustomerDropdown = false;
+					event.stopPropagation(); // Prevent modal from closing
+				}
+			}
+		}
+		
+		document.addEventListener('click', handleClickOutside, true); // Use capture phase
+		document.addEventListener('keydown', handleKeydown, true); // Use capture phase
+		
+		// Cleanup function with proper typing
+		return (() => {
+			document.removeEventListener('click', handleClickOutside, true);
+			document.removeEventListener('keydown', handleKeydown, true);
+		}) as unknown as void;
 	});
 
 	// Função para trocar abas e limpar estados
@@ -90,7 +153,7 @@
 			const response = await fetch('/api/customers?limit=1000&active=true');
 			if (response.ok) {
 				const data = await response.json();
-				customers = data.customers || [];
+				customersList = data.customers || [];
 			}
 		} catch (error) {
 			console.error('Erro ao carregar clientes:', error);
@@ -109,7 +172,46 @@
 		}
 	}
 
-	// Continua na próxima parte...
+	async function searchCustomers() {
+		if (customerSearch.length < 2) {
+			showCustomerDropdown = false;
+			customerSelectedIndex = -1;
+			return;
+		}
+		
+		searchingCustomers = true;
+		await customers.fetch({ search: customerSearch, limit: 20 });
+		const customersData = $customers;
+		customersList = customersData.customers || [];
+		searchingCustomers = false;
+		showCustomerDropdown = true;
+		customerSelectedIndex = -1;
+	}
+	
+	function selectCustomer(customer: any) {
+		orderCustomerId = customer.id.toString();
+		customerSearch = customer.name;
+		showCustomerDropdown = false;
+		customerSelectedIndex = -1;
+		orderReportActions.setFilters({ customerId: orderCustomerId });
+	}
+	
+	function clearCustomerSelection() {
+		orderCustomerId = '';
+		customerSearch = '';
+		showCustomerDropdown = false;
+		customerSelectedIndex = -1;
+		orderReportActions.setFilters({ customerId: '' });
+	}
+
+	// Funções para atualizar os filtros de data
+	function updateDateFrom() {
+		orderReportActions.setFilters({ dateFrom: orderDateFrom });
+	}
+
+	function updateDateTo() {
+		orderReportActions.setFilters({ dateTo: orderDateTo });
+	}
 
 	function applyOrderFilters() {
 		orderReportActions.setPage(1);
@@ -118,12 +220,20 @@
 
 	function resetOrderFilters() {
 		// Limpar variáveis locais
-		orderDateFrom = '';
-		orderDateTo = '';
+		const today = new Date();
+		const todayString = today.toISOString().split('T')[0];
+		orderDateFrom = todayString;
+		orderDateTo = todayString;
 		orderCustomerId = '';
 		orderAttendantId = '';
+		customerSearch = '';
 		
-		orderReportActions.clearFilters();
+		orderReportActions.setFilters({ 
+			dateFrom: orderDateFrom, 
+			dateTo: orderDateTo,
+			customerId: '',
+			attendantId: ''
+		});
 		orderReportActions.loadReport();
 	}
 
@@ -138,11 +248,41 @@
 			const response = await fetch('/api/products?limit=1000&active=true');
 			if (response.ok) {
 				const data = await response.json();
-				products = data.products || [];
+				productsList = data.products || [];
 			}
 		} catch (error) {
 			console.error('Erro ao carregar produtos:', error);
 		}
+	}
+
+	async function searchProducts() {
+		if (productSearch.length < 2) {
+			showProductDropdown = false;
+			productSelectedIndex = -1;
+			return;
+		}
+		
+		searchingProducts = true;
+		await products.fetchProducts({ search: productSearch, limit: 20 });
+		productsData = $products;
+		productsList = productsData.products;
+		searchingProducts = false;
+		showProductDropdown = true;
+		productSelectedIndex = -1;
+	}
+	
+	function selectProduct(product: any) {
+		rentalFilters.productId = product.id.toString();
+		productSearch = product.name;
+		showProductDropdown = false;
+		productSelectedIndex = -1;
+	}
+	
+	function clearProductSelection() {
+		rentalFilters.productId = '';
+		productSearch = '';
+		showProductDropdown = false;
+		productSelectedIndex = -1;
 	}
 
 	async function loadRentalReport() {
@@ -191,6 +331,7 @@
 			productId: '',
 			itemStatus: 'not_taken'
 		};
+		productSearch = '';
 		rentalPagination.page = 1;
 		loadRentalReport();
 	}
@@ -383,7 +524,8 @@
 			printWindow.focus();
 			setTimeout(() => {
 				printWindow.print();
-			}, 500);
+				printWindow.close();
+			}, 100);
 		}
 	}
 
@@ -434,7 +576,7 @@
 						<p><strong>Período:</strong> ${rentalFilters.dateFrom ? formatDate(rentalFilters.dateFrom) : '...'} até ${rentalFilters.dateTo ? formatDate(rentalFilters.dateTo) : '...'}</p>
 						` : ''}
 						${rentalFilters.productId ? `
-						<p><strong>Produto:</strong> ${products.find(p => p.id.toString() === rentalFilters.productId)?.name || 'Desconhecido'}</p>
+						<p><strong>Produto:</strong> ${productSearch || 'Desconhecido'}</p>
 						` : ''}
 						<p><strong>Total:</strong> ${rentalPagination.total} itens</p>
 					</div>
@@ -549,7 +691,7 @@
 							id="orderDateFrom"
 							type="date"
 							bind:value={orderDateFrom}
-							on:change={() => orderReportActions.setFilters({ dateFrom: orderDateFrom })}
+							on:change={updateDateFrom}
 							class="form-input"
 						/>
 					</div>
@@ -563,27 +705,67 @@
 							id="orderDateTo"
 							type="date"
 							bind:value={orderDateTo}
-							on:change={() => orderReportActions.setFilters({ dateTo: orderDateTo })}
+							on:change={updateDateTo}
 							class="form-input"
 						/>
 					</div>
 
 					<!-- Cliente -->
-					<div>
+					<div class="relative" bind:this={customerDropdownRef}>
 						<label for="orderCustomerId" class="block text-sm font-medium text-gray-700 mb-1">
 							Cliente
 						</label>
-						<select
-							id="orderCustomerId"
-							bind:value={orderCustomerId}
-							on:change={() => orderReportActions.setFilters({ customerId: orderCustomerId })}
-							class="form-input"
-						>
-							<option value="">Todos os clientes</option>
-							{#each customers as customer}
-								<option value={customer.id.toString()}>{customer.name}</option>
-							{/each}
-						</select>
+						<div class="relative">
+							<input
+								id="orderCustomerId"
+								type="text"
+								bind:value={customerSearch}
+								on:input={searchCustomers}
+								on:focus={searchCustomers}
+								placeholder="Digite para buscar clientes..."
+								class="form-input pr-10"
+								autocomplete="off"
+							/>
+							{#if orderCustomerId}
+								<!-- svelte-ignore a11y_consider_explicit_label -->
+								<button
+									type="button"
+									on:click={clearCustomerSelection}
+									class="absolute inset-y-0 right-0 pr-3 flex items-center"
+									title="Limpar seleção"
+								>
+									<svg class="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+									</svg>
+								</button>
+							{/if}
+						</div>
+						
+						<!-- Dropdown de clientes -->
+						{#if showCustomerDropdown}
+							<div class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm" style="max-height: 200px;">
+								{#if searchingCustomers}
+									<div class="px-4 py-2 text-gray-500">
+										Buscando...
+									</div>
+								{:else if customersList.length === 0}
+									<div class="px-4 py-2 text-gray-500">
+										Nenhum cliente encontrado
+									</div>
+								{:else}
+									{#each customersList as customer, i}
+										<button
+											type="button"
+											on:click={() => selectCustomer(customer)}
+											class="block w-full text-left px-4 py-2 text-sm {i === customerSelectedIndex ? 'bg-blue-100 text-blue-900' : 'text-gray-700 hover:bg-gray-100'}"
+										>
+											<div class="font-medium">{customer.name}</div>
+											<div class="text-xs text-gray-500">{customer.email || customer.phone || 'Sem contato'}</div>
+										</button>
+									{/each}
+								{/if}
+							</div>
+						{/if}
 					</div>
 
 					<!-- Atendente -->
@@ -841,20 +1023,65 @@
 						</div>
 
 						<!-- Produto -->
-						<div>
+						<div class="relative">
 							<label for="rentalProductId" class="block text-sm font-medium text-gray-700 mb-1">
 								Produto
 							</label>
-							<select
-								id="rentalProductId"
-								bind:value={rentalFilters.productId}
-								class="form-input"
-							>
-								<option value="">Todos os produtos</option>
-								{#each products as product}
-									<option value={product.id.toString()}>{product.name}</option>
-								{/each}
-							</select>
+							<div class="relative">
+								<input
+									id="rentalProductId"
+									type="text"
+									bind:value={productSearch}
+									on:input={searchProducts}
+									on:focus={searchProducts}
+									placeholder="Digite para buscar produtos..."
+									class="form-input pr-10"
+									autocomplete="off"
+								/>
+								{#if rentalFilters.productId}
+									<!-- svelte-ignore a11y_consider_explicit_label -->
+									<button
+										type="button"
+										on:click={clearProductSelection}
+										class="absolute inset-y-0 right-0 pr-3 flex items-center"
+										title="Limpar seleção"
+									>
+										<svg class="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
+								{/if}
+							</div>
+							
+							<!-- Dropdown de produtos -->
+							{#if showProductDropdown}
+								<div 
+									bind:this={productDropdownRef}
+									class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
+									style="max-height: 200px;"
+								>
+									{#if searchingProducts}
+										<div class="px-4 py-2 text-gray-500">
+											Buscando...
+										</div>
+									{:else if productsList.length === 0}
+										<div class="px-4 py-2 text-gray-500">
+											Nenhum produto encontrado
+										</div>
+									{:else}
+										{#each productsList as product, i}
+											<button
+												type="button"
+												on:click={() => selectProduct(product)}
+												class="block w-full text-left px-4 py-2 text-sm {i === productSelectedIndex ? 'bg-blue-100 text-blue-900' : 'text-gray-700 hover:bg-gray-100'}"
+											>
+												<div class="font-medium">{product.name}</div>
+												<div class="text-xs text-gray-500">SKU: {product.sku} • Estoque: {product.stockQuantity}</div>
+											</button>
+										{/each}
+									{/if}
+								</div>
+							{/if}
 						</div>
 
 						<!-- Status do Item -->
@@ -915,7 +1142,7 @@
 					{/if}
 					{#if rentalFilters.productId}
 						<span class="ml-4"><span class="font-medium">Produto:</span> 
-							{products.find(p => p.id.toString() === rentalFilters.productId)?.name || 'Desconhecido'}
+							{productSearch || 'Desconhecido'}
 						</span>
 					{/if}
 				</div>
