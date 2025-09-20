@@ -96,7 +96,7 @@
 				<div class="ml-5 w-0 flex-1">
 					<dl>
 						<dt class="text-sm font-medium text-gray-500 truncate">Receita do Mês</dt>
-						<dd class="text-lg font-medium text-gray-900">R$ {stats?.monthlyRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</dd>
+						<dd class="text-lg font-medium text-gray-900 text-right">R$ {stats?.monthlyRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</dd>
 					</dl>
 				</div>
 			</div>
@@ -135,7 +135,7 @@
 										</p>
 									</div>
 									<div class="flex-shrink-0 text-right">
-										<p class="text-sm font-medium text-gray-900">
+										<p class="text-sm font-medium text-gray-900 text-right">
 											R$ {order.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
 										</p>
 										<p class="text-sm text-gray-500">
