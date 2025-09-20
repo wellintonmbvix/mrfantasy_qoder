@@ -26,9 +26,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 				}, 
 				{ status: 400 }
 			);
-		}
-
-		console.log('Parâmetros validados:', { dateFrom, dateTo, productId, itemStatus, page, limit });
+		}		
 
 		const skip = (page - 1) * limit;
 
