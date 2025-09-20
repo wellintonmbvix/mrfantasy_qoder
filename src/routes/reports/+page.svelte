@@ -162,10 +162,10 @@
 
 	async function loadAttendants() {
 		try {
-			const response = await fetch('/api/attendants?active=true');
+			const response = await fetch('/api/employees?limit=1000');
 			if (response.ok) {
 				const data = await response.json();
-				attendants = data.attendants || [];
+				attendants = data.employees || [];
 			}
 		} catch (error) {
 			console.error('Erro ao carregar atendentes:', error);
@@ -368,19 +368,8 @@
 			console.error('Erro ao formatar data:', error, dateString);
 			return 'Data inválida';
 		}
-	}
+	}		
 	
-	// Testes para verificar se a função está funcionando corretamente
-	// (Esses testes podem ser removidos após a confirmação)
-	function testFormatDate() {
-		console.log('Teste 1:', formatDate('2025-09-15')); // Deve mostrar 15/09/2025
-		console.log('Teste 2:', formatDate('2025-01-01')); // Deve mostrar 01/01/2025
-		console.log('Teste 3:', formatDate('2025-12-31')); // Deve mostrar 31/12/2025
-	}
-	
-	// Executar os testes (pode ser removido após a confirmação)
-	testFormatDate();
-
 	function formatCurrency(value: number) {
 		return new Intl.NumberFormat('pt-BR', {
 			style: 'currency',
@@ -894,7 +883,7 @@
 							<div class="flex items-center">
 								<div class="flex-shrink-0">
 									<svg class="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v1m0 0v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
 									</svg>
 								</div>
 								<div class="ml-5 w-0 flex-1">
