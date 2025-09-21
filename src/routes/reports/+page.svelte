@@ -4,9 +4,11 @@
 	import { notificationStore } from '$lib/stores/notifications.js';
 	import { products } from '$lib/stores/products.js';
 	import { customers } from '$lib/stores/customers.js';
+	import { user } from '$lib/stores/auth.js';
 
 	// Estado das abas
-	let activeTab: 'orders' | 'rental' = 'orders';
+	let activeTab: 'orders' | 'rental' = 'rental'; // Começa na aba de aluguel por padrão
+	let currentUser: any = null;
 
 	// Estados do relatório de pedidos
 	let orderReportState: any;
@@ -62,6 +64,21 @@
 		}
 	});
 
+	// Subscrever ao store de usuário para verificar permissões
+	user.subscribe(u => {
+		currentUser = u;
+		// Se o usuário não tem permissão para acessar relatórios de pedidos, mantém na aba de aluguel
+		if (activeTab === 'orders' && !hasOrdersReportAccess()) {
+			activeTab = 'rental';
+		}
+	});
+
+	// Função para verificar se o usuário tem acesso ao relatório de pedidos
+	function hasOrdersReportAccess() {
+		if (!currentUser) return false;
+		return currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER';
+	}
+
 	onMount(async () => {
 		await loadCustomers();
 		await loadAttendants();
@@ -74,11 +91,9 @@
 		orderDateTo = todayString;
 		orderReportActions.setFilters({ dateFrom: orderDateFrom, dateTo: orderDateTo });
 		
-		if (activeTab === 'orders') {
-			await orderReportActions.loadReport();
-		} else {
-			await loadRentalReport();
-		}
+		// Sempre começar na aba de aluguel para garantir acesso a todos os usuários
+		activeTab = 'rental';
+		await loadRentalReport();
 		
 		// Add global click listener to close dropdowns when clicking outside
 		function handleClickOutside(event: MouseEvent) {
@@ -125,6 +140,13 @@
 
 	// Função para trocar abas e limpar estados
 	function switchTab(tab: 'orders' | 'rental') {
+		// Verifica permissões antes de permitir acesso à aba de pedidos
+		if (tab === 'orders' && !hasOrdersReportAccess()) {
+			// Se não tem permissão, mostra uma mensagem e mantém na aba atual
+			notificationStore.error('Acesso restrito. Apenas administradores e gerentes podem acessar esta aba.');
+			return;
+		}
+		
 		activeTab = tab;
 		
 		// Limpar estados da aba anterior
@@ -660,17 +682,23 @@
 	<!-- Sistema de abas -->
 	<div class="border-b border-gray-200">
 		<nav class="-mb-px flex space-x-8">
-			<button
-				on:click={() => switchTab('orders')}
-				class="{activeTab === 'orders' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
-			>
-				Relatório de Pedidos
-			</button>
+			<!-- Aba de Relatório de Itens de Aluguel - Acessível a todos -->
 			<button
 				on:click={() => switchTab('rental')}
 				class="{activeTab === 'rental' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm"
 			>
 				Relatório de Itens de Aluguel
+			</button>
+			
+			<!-- Aba de Relatório de Pedidos - Restrita a administradores e gerentes -->
+			<button
+				on:click={() => switchTab('orders')}
+				class="{activeTab === 'orders' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center"
+			>
+				Relatório de Pedidos
+				<span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+					Restrito
+				</span>
 			</button>
 		</nav>
 	</div>

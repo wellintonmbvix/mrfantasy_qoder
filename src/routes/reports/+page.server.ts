@@ -8,11 +8,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw redirect(302, '/auth/login');
 	}
 
-	// Verificar se o usuário tem permissão (ADMIN ou MANAGER)
-	if (locals.user.role !== 'ADMIN' && locals.user.role !== 'MANAGER') {
-		throw redirect(302, '/dashboard');
-	}
-
 	// Carregar dados para os filtros
 	const [customers, employees] = await Promise.all([
 		prisma.customer.findMany({
