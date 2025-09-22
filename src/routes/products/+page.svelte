@@ -26,6 +26,9 @@
 		productsData = $products;
 		uiState = $ui;
 	}
+	
+	// Reactive declaration to ensure pagination is updated
+	$: currentPage = productsData?.pagination?.page || currentPage;
 
 	onMount(() => {
 		loadData();
@@ -162,8 +165,28 @@
 	}
 
 	function changePage(page: number) {
-		currentPage = page;
-		loadProducts();
+		// Garantir que a página esteja dentro dos limites válidos
+		if (productsData.pagination) {
+			page = Math.max(1, Math.min(page, productsData.pagination.pages));
+		}
+		
+		if (page !== currentPage) {
+			currentPage = page;
+			loadProducts();
+			
+			// Forçar a atualização do estado
+			productsData = $products;
+		}
+	}
+
+	// Função auxiliar para verificar se está na última página
+	function isLastPage() {
+		return productsData.pagination && currentPage >= productsData.pagination.pages;
+	}
+
+	// Função auxiliar para verificar se está na primeira página
+	function isFirstPage() {
+		return currentPage <= 1;
 	}
 
 	function getStockStatusColor(stockQuantity: number) {
@@ -445,7 +468,7 @@
 
 									<button
 										on:click={() => changePage(currentPage + 1)}
-										disabled={currentPage >= productsData.pagination.pages}
+										disabled={currentPage >= productsData.pagination.pages || productsData.pagination.pages <= 1}
 										class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
 									>
 										<span class="sr-only">Próximo</span>

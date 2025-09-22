@@ -80,25 +80,42 @@ function createProductsStore() {
 				const data = await response.json();
 
 				if (response.ok) {
-					update(state => ({
-						...state,
+					const newState = {
 						products: data.products,
-						pagination: data.pagination,
-						loading: false
-					}));
+						groups: [],
+						loading: false,
+						error: null,
+						pagination: data.pagination
+					};
+					
+					// Forçar a atualização do estado
+					set(newState);
+					return newState;
 				} else {
-					update(state => ({
-						...state,
+					const newState = {
+						products: [],
+						groups: [],
+						loading: false,
 						error: data.error || 'Erro ao carregar produtos',
-						loading: false
-					}));
+						pagination: null
+					};
+					
+					// Forçar a atualização do estado
+					set(newState);
+					return newState;
 				}
 			} catch (error) {
-				update(state => ({
-					...state,
+				const newState = {
+					products: [],
+					groups: [],
+					loading: false,
 					error: 'Erro de conexão',
-					loading: false
-				}));
+					pagination: null
+				};
+				
+				// Forçar a atualização do estado
+				set(newState);
+				return newState;
 			}
 		},
 		fetchGroups: async (params: { search?: string; category?: string } = {}) => {
