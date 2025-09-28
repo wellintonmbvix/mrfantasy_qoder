@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { prisma } from '$lib/server/database.js';
 import { z } from 'zod';
+import { createAuditLog } from '$lib/server/auditLog.js'; // Importando serviço de auditoria
 
 const EmployeeUpdateSchema = z.object({
 	name: z.string().min(1, 'Nome é obrigatório').optional(),
@@ -42,11 +43,16 @@ export const GET: RequestHandler = async ({ params }) => {
 	}
 };
 
-export const PUT: RequestHandler = async ({ params, request }) => {
+export const PUT: RequestHandler = async ({ params, request, locals }) => {
 	try {
 		if (!params.id) {
 			return json({ error: 'ID do funcionário é obrigatório' }, { status: 400 });
 		}
+
+		// Obter dados originais antes da atualização para o log
+		const originalEmployee = await prisma.employee.findUnique({
+			where: { id: parseInt(params.id) }
+		});
 
 		const data = await request.json();
 		const validatedData = EmployeeUpdateSchema.parse(data);
@@ -89,6 +95,21 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 			data: updateData
 		});
 
+		// Registrar log de auditoria para atualização
+		try {
+			if (locals.user && originalEmployee) {
+				await createAuditLog({
+					module: 'employees',
+					actionType: 'UPDATE',
+					originalData: originalEmployee,
+					newData: employee,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
+
 		return json(employee);
 	} catch (error) {
 		if (error instanceof z.ZodError) {
@@ -102,16 +123,35 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 	}
 };
 
-export const DELETE: RequestHandler = async ({ params }) => {
+export const DELETE: RequestHandler = async ({ params, locals }) => {
 	try {
 		if (!params.id) {
 			return json({ error: 'ID do funcionário é obrigatório' }, { status: 400 });
 		}
 
+		// Obter dados originais antes da exclusão para o log
+		const originalEmployee = await prisma.employee.findUnique({
+			where: { id: parseInt(params.id) }
+		});
+
 		await prisma.employee.update({
 			where: { id: parseInt(params.id) },
 			data: { active: false }
 		});
+
+		// Registrar log de auditoria para exclusão
+		try {
+			if (locals.user && originalEmployee) {
+				await createAuditLog({
+					module: 'employees',
+					actionType: 'DELETE',
+					originalData: originalEmployee,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
 
 		return json({ success: true });
 	} catch (error) {

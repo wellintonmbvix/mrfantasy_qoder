@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
 import { z } from 'zod';
 import { requireRole } from '$lib/server/middleware.js';
+import { createAuditLog } from '$lib/server/auditLog.js';
 
 const OrderUpdateSchema = z.object({
 	status: z.enum(['PENDING', 'CONFIRMED', 'DELIVERED', 'RETURNED', 'CANCELLED']).optional(),
@@ -95,10 +96,40 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 			return json({ error: 'Usuário não autenticado' }, { status: 401 });
 		}
 
+		// Obter dados originais antes da atualização para o log
+		const orderId = parseInt(params.id);
+		const originalOrder = await prisma.order.findUnique({
+			where: { id: orderId },
+			include: {
+				customer: true,
+				user: {
+					select: {
+						id: true,
+						username: true
+					}
+				},
+				attendant: {
+					select: {
+						id: true,
+						name: true,
+						abbreviation: true
+					}
+				},
+				orderItems: {
+					include: {
+						product: true
+					}
+				},
+				orderPayments: {
+					include: {
+						paymentMethod: true
+					}
+				}
+			}
+		});
+
 		const data = await request.json();
 		const validatedData = OrderUpdateSchema.parse(data);
-
-		const orderId = parseInt(params.id);
 
 		// Get current order
 		const currentOrder = await prisma.order.findUnique({
@@ -210,94 +241,34 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 			}
 		};
 
-		// Handle status changes that affect inventory
-		if (validatedData.status && validatedData.status !== currentOrder.status) {
-			if (validatedData.status === 'DELIVERED') {
-				// When order status changes to DELIVERED, mark all rental items as taken
-				await prisma.$transaction(async (tx: any) => {
-					await updateRentalItemsTaken(tx, orderId, true);
+		// Update order in a transaction
+		const updatedOrder = await prisma.$transaction(async (tx: any) => {
+			// Update order fields
+			const updateData: any = {
+				...validatedData,
+				// Handle date fields properly
+				rentalStartDate: validatedData.rentalStartDate,
+				rentalEndDate: validatedData.rentalEndDate,
+				returnDate: validatedData.returnDate
+			};
+
+			// Auto-update status to DELIVERED if all rental items are taken and status is not already DELIVERED/RETURNED/CANCELLED
+			if (validatedData.orderItems && 
+				!['DELIVERED', 'RETURNED', 'CANCELLED'].includes(currentOrder.status)) {
+				// Create a copy of current order items with updates applied
+				const updatedOrderItems = currentOrder.orderItems.map(item => {
+					const update = validatedData.orderItems?.find(u => u.id === item.id);
+					return update ? { ...item, ...update } : item;
 				});
-			}
-
-			if (validatedData.status === 'CANCELLED' && currentOrder.status !== 'CANCELLED') {
-				// Return items to stock
-				await prisma.$transaction(async (tx: any) => {
-					for (const item of currentOrder.orderItems) {
-						await tx.product.update({
-							where: { id: item.productId },
-							data: {
-								stockQuantity: {
-									increment: item.quantity
-								}
-							}
-						});
-
-						// Create inventory log
-						await tx.inventoryLog.create({
-							data: {
-								productId: item.productId,
-								quantityChange: item.quantity,
-								operationType: 'RETURN',
-								reason: `Cancelamento do pedido ${currentOrder.orderNumber}`,
-								userId: locals.user!.id
-							}
-						});
-					}
-				});
-			}
-
-			if (validatedData.status === 'RETURNED') {
-				// Check if order has rental items
-				const hasRentalItems = currentOrder.orderItems.some(item => item.itemType === 'RENTAL');
 				
-				if (hasRentalItems) {
-					// Return rental items to stock
-					await prisma.$transaction(async (tx: any) => {
-						for (const item of currentOrder.orderItems) {
-							if (item.itemType === 'RENTAL') {
-								await tx.product.update({
-									where: { id: item.productId },
-									data: {
-										stockQuantity: {
-											increment: item.quantity
-										}
-									}
-								});
-
-								// Create inventory log
-								await tx.inventoryLog.create({
-									data: {
-										productId: item.productId,
-										quantityChange: item.quantity,
-										operationType: 'RETURN',
-										reason: `Devolução do aluguel - Pedido ${currentOrder.orderNumber}`,
-										userId: locals.user!.id
-									}
-								});
-							}
-						}
-					});
-
-					// Set return date if not provided
-					if (!validatedData.returnDate) {
-						validatedData.returnDate = new Date();
-					}
+				if (checkAllRentalItemsTaken(updatedOrderItems)) {
+					updateData.status = 'DELIVERED';
 				}
 			}
-		}
 
-		const order = await prisma.$transaction(async (tx: any) => {
-			// Update order
 			const updatedOrder = await tx.order.update({
 				where: { id: orderId },
-				data: {
-					status: validatedData.status,
-					attendantId: validatedData.attendantId,
-					rentalStartDate: validatedData.rentalStartDate,
-					rentalEndDate: validatedData.rentalEndDate,
-					returnDate: validatedData.returnDate,
-					notes: validatedData.notes
-				}
+				data: updateData
 			});
 
 			// Update order items if provided
@@ -383,6 +354,45 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 				amount: Number(payment.amount)
 			}))
 		};
+
+		// Registrar log de auditoria para atualização
+		try {
+			if (locals.user && originalOrder) {
+				// Serializar o pedido original também
+				const serializedOriginalOrder = {
+					...originalOrder,
+					subtotalAmount: Number(originalOrder.subtotalAmount),
+					totalAmount: Number(originalOrder.totalAmount),
+					discountValue: originalOrder.discountValue ? Number(originalOrder.discountValue) : null,
+					orderItems: originalOrder.orderItems.map(item => ({
+						...item,
+						unitPrice: Number(item.unitPrice),
+						totalPrice: Number(item.totalPrice),
+						discountValue: item.discountValue ? Number(item.discountValue) : null,
+						product: {
+							...item.product,
+							costPrice: Number(item.product.costPrice),
+							rentalPrice: Number(item.product.rentalPrice),
+							salePrice: Number(item.product.salePrice)
+						}
+					})),
+					orderPayments: originalOrder.orderPayments.map(payment => ({
+						...payment,
+						amount: Number(payment.amount)
+					}))
+				};
+
+				await createAuditLog({
+					module: 'orders',
+					actionType: 'UPDATE',
+					originalData: serializedOriginalOrder,
+					newData: serializedOrder,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
 
 		return json(serializedOrder);
 	} catch (error) {

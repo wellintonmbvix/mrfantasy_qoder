@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { prisma } from '$lib/server/database.js';
 import { cashTransactionSchema } from '$lib/utils/validation';
 import { ZodError } from 'zod';
+import { createAuditLog } from '$lib/server/auditLog.js'; // Importando serviço de auditoria
 
 /**
  * GET /api/cash-transactions - Lista transações de caixa com filtros
@@ -178,6 +179,20 @@ export const POST = async ({ request, locals }) => {
 				}
 			}
 		});
+
+		// Registrar log de auditoria para criação
+		try {
+			if (locals.user) {
+				await createAuditLog({
+					module: 'cash-transactions',
+					actionType: 'CREATE',
+					newData: transaction,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
 
 		return json(transaction, { status: 201 });
 	} catch (error) {

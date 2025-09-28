@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
 import { z } from 'zod';
+import { createAuditLog } from '$lib/server/auditLog.js'; // Importando serviço de auditoria
 
 const ProductUpdateSchema = z.object({
 	name: z.string().min(1, 'Nome é obrigatório').optional(),
@@ -69,8 +70,16 @@ export const GET: RequestHandler = async ({ params }) => {
 	}
 };
 
-export const PUT: RequestHandler = async ({ params, request }) => {
+export const PUT: RequestHandler = async ({ params, request, locals }) => {
 	try {
+		// Obter dados originais antes da atualização para o log
+		const originalProduct = await prisma.product.findUnique({
+			where: { id: parseInt(params.id) },
+			include: {
+				group: true
+			}
+		});
+
 		const data = await request.json();
 		const validatedData = ProductUpdateSchema.parse(data);
 
@@ -123,6 +132,29 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 			salePrice: Number(product.salePrice)
 		};
 
+		// Registrar log de auditoria para atualização
+		try {
+			if (locals.user && originalProduct) {
+				// Serializar o produto original também
+				const serializedOriginalProduct = {
+					...originalProduct,
+					costPrice: Number(originalProduct.costPrice),
+					rentalPrice: Number(originalProduct.rentalPrice),
+					salePrice: Number(originalProduct.salePrice)
+				};
+
+				await createAuditLog({
+					module: 'products',
+					actionType: 'UPDATE',
+					originalData: serializedOriginalProduct,
+					newData: serializedProduct,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
+
 		return json(serializedProduct);
 	} catch (error) {
 		if (error instanceof z.ZodError) {
@@ -136,8 +168,16 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 	}
 };
 
-export const DELETE: RequestHandler = async ({ params }) => {
+export const DELETE: RequestHandler = async ({ params, locals }) => {
 	try {
+		// Obter dados originais antes da exclusão para o log
+		const originalProduct = await prisma.product.findUnique({
+			where: { id: parseInt(params.id) },
+			include: {
+				group: true
+			}
+		});
+
 		// Check if product has active orders
 		const activeOrders = await prisma.orderItem.count({
 			where: {
@@ -159,6 +199,28 @@ export const DELETE: RequestHandler = async ({ params }) => {
 			where: { id: parseInt(params.id) },
 			data: { active: false }
 		});
+
+		// Registrar log de auditoria para exclusão
+		try {
+			if (locals.user && originalProduct) {
+				// Serializar o produto original também
+				const serializedOriginalProduct = {
+					...originalProduct,
+					costPrice: Number(originalProduct.costPrice),
+					rentalPrice: Number(originalProduct.rentalPrice),
+					salePrice: Number(originalProduct.salePrice)
+				};
+
+				await createAuditLog({
+					module: 'products',
+					actionType: 'DELETE',
+					originalData: serializedOriginalProduct,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
 
 		return json({ success: true });
 	} catch (error) {

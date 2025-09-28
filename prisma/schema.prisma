@@ -25,6 +25,7 @@ model User {
   inventoryLogs InventoryLog[]
   cashTransactions CashTransaction[]
   cancelledCashTransactions CashTransaction[] @relation("CashTransactionCancelledBy")
+  auditLogs    AuditLog[]
 
   @@map("users")
 }
@@ -275,6 +276,25 @@ model CashTransaction {
   cancelledByUser User?                  @relation("CashTransactionCancelledBy", fields: [cancelledBy], references: [id])
 
   @@map("cash_transactions")
+}
+
+// Modelo para logs de auditoria
+model AuditLog {
+  id              Int        @id @default(autoincrement())
+  timestamp       DateTime   @default(now())
+  module          String     // Módulo onde ocorreu a operação (customers, employees, etc.)
+  actionType      String     // Tipo de operação (CREATE, UPDATE, DELETE)
+  originalData    String?    @db.Text // Dados originais em formato JSON
+  newData         String?    @db.Text // Novos dados em formato JSON (para UPDATE/CREATE)
+  userId          Int        @map("user_id")
+  ipAddress       String?    @map("ip_address")
+  userAgent       String?    @db.Text @map("user_agent")
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  // Relations
+  user            User       @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
 }
 
 // Enums

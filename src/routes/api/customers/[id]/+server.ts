@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
 import { z } from 'zod';
+import { createAuditLog } from '$lib/server/auditLog.js'; // Importando serviço de auditoria
 
 const CustomerUpdateSchema = z.object({
 	name: z.string().min(1, 'Nome é obrigatório').optional(),
@@ -40,8 +41,13 @@ export const GET: RequestHandler = async ({ params }) => {
 	}
 };
 
-export const PUT: RequestHandler = async ({ params, request }) => {
+export const PUT: RequestHandler = async ({ params, request, locals }) => {
 	try {
+		// Obter dados originais antes da atualização para o log
+		const originalCustomer = await prisma.customer.findUnique({
+			where: { id: parseInt(params.id) }
+		});
+
 		const data = await request.json();
 		const validatedData = CustomerUpdateSchema.parse(data);
 
@@ -74,6 +80,21 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 			data: validatedData
 		});
 
+		// Registrar log de auditoria para atualização
+		try {
+			if (locals.user && originalCustomer) {
+				await createAuditLog({
+					module: 'customers',
+					actionType: 'UPDATE',
+					originalData: originalCustomer,
+					newData: customer,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
+
 		return json(customer);
 	} catch (error) {
 		if (error instanceof z.ZodError) {
@@ -87,12 +108,31 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 	}
 };
 
-export const DELETE: RequestHandler = async ({ params }) => {
+export const DELETE: RequestHandler = async ({ params, locals }) => {
 	try {
+		// Obter dados originais antes da exclusão para o log
+		const originalCustomer = await prisma.customer.findUnique({
+			where: { id: parseInt(params.id) }
+		});
+
 		await prisma.customer.update({
 			where: { id: parseInt(params.id) },
 			data: { active: false }
 		});
+
+		// Registrar log de auditoria para exclusão
+		try {
+			if (locals.user && originalCustomer) {
+				await createAuditLog({
+					module: 'customers',
+					actionType: 'DELETE',
+					originalData: originalCustomer,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
 
 		return json({ success: true });
 	} catch (error) {

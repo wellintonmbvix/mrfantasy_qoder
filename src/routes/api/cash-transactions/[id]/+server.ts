@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { prisma } from '$lib/server/database.js';
 import { cancelCashTransactionSchema } from '$lib/utils/validation';
 import { ZodError } from 'zod';
+import { createAuditLog } from '$lib/server/auditLog.js'; // Importando serviço de auditoria
 
 /**
  * GET /api/cash-transactions/[id] - Busca transação específica
@@ -78,6 +79,27 @@ export const PUT = async ({ params, request, locals }) => {
 			return json({ error: 'ID inválido' }, { status: 400 });
 		}
 
+		// Obter dados originais antes do cancelamento para o log
+		const originalTransaction = await prisma.cashTransaction.findUnique({
+			where: { id },
+			include: {
+				user: {
+					select: {
+						id: true,
+						username: true,
+						email: true
+					}
+				},
+				cancelledByUser: {
+					select: {
+						id: true,
+						username: true,
+						email: true
+					}
+				}
+			}
+		});
+
 		const data = await request.json();
 		const validatedData = cancelCashTransactionSchema.parse({
 			id,
@@ -123,6 +145,21 @@ export const PUT = async ({ params, request, locals }) => {
 				}
 			}
 		});
+
+		// Registrar log de auditoria para cancelamento
+		try {
+			if (locals.user && originalTransaction) {
+				await createAuditLog({
+					module: 'cash-transactions',
+					actionType: 'UPDATE',
+					originalData: originalTransaction,
+					newData: cancelledTransaction,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
 
 		return json(cancelledTransaction);
 	} catch (error) {

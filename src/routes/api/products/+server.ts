@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
 import { ProductType } from '@prisma/client';
 import { z } from 'zod';
+import { createAuditLog } from '$lib/server/auditLog.js'; // Importando serviço de auditoria
 
 const ProductSchema = z.object({
 	name: z.string().min(1, 'Nome é obrigatório'),
@@ -87,7 +88,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	}
 };
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		const data = await request.json();
 		const validatedData = ProductSchema.parse(data);
@@ -130,6 +131,20 @@ export const POST: RequestHandler = async ({ request }) => {
 			rentalPrice: Number(product.rentalPrice),
 			salePrice: Number(product.salePrice)
 		};
+
+		// Registrar log de auditoria para criação
+		try {
+			if (locals.user) {
+				await createAuditLog({
+					module: 'products',
+					actionType: 'CREATE',
+					newData: serializedProduct,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
 
 		return json(serializedProduct, { status: 201 });
 	} catch (error) {

@@ -3,6 +3,22 @@ import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/database.js';
 import { z } from 'zod';
 import { calculateDiscount, applyDiscount, distributeOrderDiscount, calculateSurcharge, applySurcharge, distributeOrderSurcharge } from '$lib/utils/validation.js';
+import { createAuditLog } from '$lib/server/auditLog.js'; // Importando serviço de auditoria
+
+// Interface for processed order items
+interface ProcessedOrderItem {
+	productId: number;
+	quantity: number;
+	unitPrice: number;
+	discountType?: 'PERCENTAGE' | 'FIXED';
+	discountValue?: number;
+	surchargeType?: 'PERCENTAGE' | 'FIXED';
+	surchargeValue?: number;
+	itemType: 'RENTAL' | 'SALE';
+	itemTaken?: boolean;
+	itemReturned?: boolean;
+	totalPrice: number;
+}
 
 // Use consistent validation schema
 const OrderItemSchema = z.object({
@@ -241,131 +257,18 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
-		if (!locals.user) {
-			return json({ error: 'Usuário não autenticado' }, { status: 401 });
-		}
-
 		const data = await request.json();
-		console.log('Received order data:', JSON.stringify(data, null, 2));
-		
-		// Ensure data types are correct before validation
-		if (data.items) {
-			data.items = data.items.map((item: any) => ({
-				...item,
-				productId: parseInt(item.productId),
-				quantity: parseInt(item.quantity),
-				unitPrice: parseFloat(item.unitPrice),
-				discountValue: item.discountValue ? parseFloat(item.discountValue) : undefined,
-				surchargeValue: item.surchargeValue ? parseFloat(item.surchargeValue) : undefined
-			}));
-		}
-		
-		if (data.payments) {
-			data.payments = data.payments.map((payment: any) => ({
-				...payment,
-				paymentMethodId: parseInt(payment.paymentMethodId),
-				amount: parseFloat(payment.amount)
-			}));
-		}
-		
-		if (data.customerId) {
-			data.customerId = parseInt(data.customerId);
-		}
-		
-		if (data.discountValue) {
-			data.discountValue = parseFloat(data.discountValue);
-		}
-		
-		if (data.surchargeValue) {
-			data.surchargeValue = parseFloat(data.surchargeValue);
-		}
-		
-		// Log each item's unitPrice type after conversion
-		if (data.items) {
-			data.items.forEach((item: any, index: number) => {
-				console.log(`Item ${index} after conversion - unitPrice:`, item.unitPrice, 'Type:', typeof item.unitPrice);
-			});
-		}
-		
 		const validatedData = OrderSchema.parse(data);
 
 		// Generate order number
-		const orderCount = await prisma.order.count();
-		const orderNumber = `ORD-${String(orderCount + 1).padStart(6, '0')}`;
+		const orderNumber = `PED-${Date.now()}`;
 
-		// Calculate amounts with discount logic
+		// Process items and calculate totals
+		const processedItems: ProcessedOrderItem[] = [];
 		let subtotalAmount = 0;
-		let processedItems = [...validatedData.items];
-		
-		// If there's an order-level discount, distribute it across items
-		if (validatedData.discountType && validatedData.discountValue) {
-			const itemDiscounts = distributeOrderDiscount(
-				validatedData.items,
-				validatedData.discountType,
-				validatedData.discountValue
-			);
-			
-			processedItems = validatedData.items.map((item, index) => ({
-				...item,
-				discountType: itemDiscounts[index].discountType,
-				discountValue: (item.discountValue || 0) + itemDiscounts[index].discountValue
-			}));
-		}
-		
-		// If there's an order-level surcharge, distribute it across items
-		if (validatedData.surchargeType && validatedData.surchargeValue) {
-			const itemSurcharges = distributeOrderSurcharge(
-				processedItems,
-				validatedData.surchargeType,
-				validatedData.surchargeValue
-			);
-			
-			processedItems = processedItems.map((item, index) => ({
-				...item,
-				surchargeType: itemSurcharges[index].surchargeType,
-				surchargeValue: (item.surchargeValue || 0) + itemSurcharges[index].surchargeValue
-			}));
-		}
-		
-		// Calculate subtotal and total amounts
-		// Subtotal = soma dos preços unitários x quantidade (sem descontos/acréscimos)
-		for (const item of processedItems) {
-			subtotalAmount += item.unitPrice * item.quantity;
-		}
-		
-		// Total = soma dos valores finais de cada item (com descontos/acréscimos individuais)
-		let totalAmount = 0;
-		for (const item of processedItems) {
-			let itemTotal = item.unitPrice * item.quantity;
-			
-			// Apply item-level discount first
-			if (item.discountType && item.discountValue && item.discountValue > 0) {
-				itemTotal = applyDiscount(itemTotal, item.discountType, item.discountValue);
-			}
-			
-			// Then apply item-level surcharge
-			if (item.surchargeType && item.surchargeValue && item.surchargeValue > 0) {
-				itemTotal = applySurcharge(itemTotal, item.surchargeType, item.surchargeValue);
-			}
-			
-			totalAmount += itemTotal;
-		}
-		
-		// Apply order-level discount and surcharge to total
-		if (validatedData.discountType && validatedData.discountValue) {
-			totalAmount = applyDiscount(totalAmount, validatedData.discountType, validatedData.discountValue);
-		}
-		
-		if (validatedData.surchargeType && validatedData.surchargeValue) {
-			totalAmount = applySurcharge(totalAmount, validatedData.surchargeType, validatedData.surchargeValue);
-		}
-		
-		// Check system settings for negative stock allowance
-		const settings = await prisma.settings.findFirst();
-		const allowNegativeStock = settings?.allowNegativeStock || false;
-		
-		// Validate products and stock
-		for (const item of processedItems) {
+
+		for (const item of validatedData.items) {
+			// Validate product
 			const product = await prisma.product.findUnique({
 				where: { id: item.productId }
 			});
@@ -377,35 +280,96 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				);
 			}
 
-			if (!allowNegativeStock && product.stockQuantity < item.quantity) {
+			// Check stock for SALE items
+			if (item.itemType === 'SALE' && product.stockQuantity < item.quantity) {
 				return json(
-					{ error: `Estoque insuficiente para ${product.name}. Estoque atual: ${product.stockQuantity}` },
+					{ error: `Estoque insuficiente para o produto ${product.name}` },
 					{ status: 400 }
 				);
 			}
 
-			// Verify product is available for the item type
-			if (item.itemType === 'RENTAL' && !product.availableForRental) {
+			// For RENTAL items, check if rental dates are provided
+			if (item.itemType === 'RENTAL' && (!validatedData.rentalStartDate || !validatedData.rentalEndDate)) {
 				return json(
-					{ error: `${product.name} não está disponível para aluguel` },
+					{ error: 'Datas de início e fim do aluguel são obrigatórias para itens de aluguel' },
 					{ status: 400 }
 				);
 			}
 
-			if (item.itemType === 'SALE' && !product.availableForSale) {
+			// Calculate item total
+			let itemTotal = item.unitPrice * item.quantity;
+
+			// Apply discount
+			if (item.discountType && item.discountValue) {
+				itemTotal = applyDiscount(itemTotal, item.discountType, item.discountValue);
+			}
+
+			// Apply surcharge
+			if (item.surchargeType && item.surchargeValue) {
+				itemTotal = applySurcharge(itemTotal, item.surchargeType, item.surchargeValue);
+			}
+
+			subtotalAmount += itemTotal;
+			processedItems.push({
+				productId: item.productId,
+				quantity: item.quantity,
+				unitPrice: item.unitPrice,
+				discountType: item.discountType,
+				discountValue: item.discountValue,
+				surchargeType: item.surchargeType,
+				surchargeValue: item.surchargeValue,
+				itemType: item.itemType,
+				itemTaken: item.itemTaken,
+				itemReturned: item.itemReturned,
+				totalPrice: itemTotal
+			});
+		}
+
+		// Apply order discount
+		let totalAmount = subtotalAmount;
+		if (validatedData.discountType && validatedData.discountValue) {
+			const orderDiscount = calculateDiscount(subtotalAmount, validatedData.discountType, validatedData.discountValue);
+			totalAmount = subtotalAmount - orderDiscount;
+		}
+
+		// Apply order surcharge
+		if (validatedData.surchargeType && validatedData.surchargeValue) {
+			const orderSurcharge = calculateSurcharge(totalAmount, validatedData.surchargeType, validatedData.surchargeValue);
+			totalAmount = totalAmount + orderSurcharge;
+		}
+
+		// Validate customer if provided
+		if (validatedData.customerId) {
+			const customer = await prisma.customer.findUnique({
+				where: { id: validatedData.customerId }
+			});
+
+			if (!customer || !customer.active) {
 				return json(
-					{ error: `${product.name} não está disponível para venda` },
+					{ error: `Cliente ID ${validatedData.customerId} não encontrado ou inativo` },
 					{ status: 400 }
 				);
 			}
 		}
-		
+
+		// Validate attendant
+		const attendant = await prisma.employee.findUnique({
+			where: { id: validatedData.attendantId }
+		});
+
+		if (!attendant || !attendant.active) {
+			return json(
+				{ error: `Atendente ID ${validatedData.attendantId} não encontrado ou inativo` },
+				{ status: 400 }
+			);
+		}
+
 		// Validate payment methods
 		for (const payment of validatedData.payments) {
 			const paymentMethod = await prisma.paymentMethod.findUnique({
 				where: { id: payment.paymentMethodId }
 			});
-			
+
 			if (!paymentMethod || !paymentMethod.active) {
 				return json(
 					{ error: `Meio de pagamento ID ${payment.paymentMethodId} não encontrado ou inativo` },
@@ -413,7 +377,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				);
 			}
 		}
-		
+
 		// Validate payment total
 		const totalPayments = validatedData.payments.reduce((sum, payment) => sum + payment.amount, 0);
 		if (Math.abs(totalAmount - totalPayments) > 0.01) {
@@ -428,7 +392,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// If has any RENTAL items, keep as PENDING
 		const allItemsAreSale = processedItems.every(item => item.itemType === 'SALE');
 		const hasRentalItems = processedItems.some(item => item.itemType === 'RENTAL');
-		
+
 		const orderStatus = allItemsAreSale ? 'CONFIRMED' : 'PENDING';
 
 		// Create order in a transaction
@@ -458,20 +422,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			for (const item of processedItems) {
 				// Calculate item total price with discount and surcharge
 				let itemTotalPrice = item.unitPrice * item.quantity;
-				
+
 				// Apply discount first
 				if (item.discountType && item.discountValue && item.discountValue > 0) {
 					itemTotalPrice = applyDiscount(itemTotalPrice, item.discountType, item.discountValue);
 				}
-				
+
 				// Then apply surcharge
 				if (item.surchargeType && item.surchargeValue && item.surchargeValue > 0) {
 					itemTotalPrice = applySurcharge(itemTotalPrice, item.surchargeType, item.surchargeValue);
 				}
-				
+
 				// Determine if item should be automatically marked as taken
 				let itemTaken = item.itemTaken || false;
-				
+
 				// Rule: Auto-set itemTaken to true if:
 				// 1. item_type is 'SALE', OR
 				// 2. item_type is 'RENTAL' AND rental_start_date equals order_date
@@ -481,12 +445,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					// Compare dates (ignore time component)
 					const orderDateOnly = new Date(validatedData.orderDate.getFullYear(), validatedData.orderDate.getMonth(), validatedData.orderDate.getDate());
 					const rentalStartDateOnly = new Date(validatedData.rentalStartDate.getFullYear(), validatedData.rentalStartDate.getMonth(), validatedData.rentalStartDate.getDate());
-					
+
 					if (orderDateOnly.getTime() === rentalStartDateOnly.getTime()) {
 						itemTaken = true;
 					}
 				}
-				
+
 				await tx.orderItem.create({
 					data: {
 						orderId: newOrder.id,
@@ -525,7 +489,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					}
 				});
 			}
-			
+
 			// Create order payments
 			for (const payment of validatedData.payments) {
 				await tx.orderPayment.create({
@@ -597,6 +561,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				amount: Number(payment.amount)
 			}))
 		};
+
+		// Registrar log de auditoria para criação
+		try {
+			if (locals.user) {
+				await createAuditLog({
+					module: 'orders',
+					actionType: 'CREATE',
+					newData: serializedCreatedOrder,
+					userId: locals.user.id
+				});
+			}
+		} catch (logError) {
+			console.error('Erro ao registrar log de auditoria:', logError);
+		}
 
 		return json(serializedCreatedOrder, { status: 201 });
 	} catch (error) {
