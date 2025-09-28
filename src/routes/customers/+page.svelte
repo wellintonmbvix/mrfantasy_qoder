@@ -91,6 +91,33 @@
 		currentPage = page;
 		loadCustomers();
 	}
+
+	// Função para gerar páginas com elipses
+	function generatePageNumbers(current: number, total: number): (number | '...')[] {
+		const delta = 2; // Número de páginas ao redor da página atual
+		const range: (number | '...')[] = [];
+		const rangeWithDots: (number | '...')[] = [];
+
+		for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
+			range.push(i);
+		}
+
+		if (current - delta > 2) {
+			rangeWithDots.push(1, '...');
+		} else {
+			rangeWithDots.push(1);
+		}
+
+		rangeWithDots.push(...range);
+
+		if (current + delta < total - 1) {
+			rangeWithDots.push('...', total);
+		} else if (total > 1) {
+			rangeWithDots.push(total);
+		}
+
+		return rangeWithDots;
+	}
 </script>
 
 <svelte:head>
@@ -164,7 +191,7 @@
 		<div class="text-center py-12">
 			<svg class="animate-spin h-8 w-8 text-primary-600 mx-auto" fill="none" viewBox="0 0 24 24">
 				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-				<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+				<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 00.712-3.714M14 40H4v-4a6 6 0 0110.713-3.714M14 40v-4c0-1.313.253-2.566.713-3.714m0 0A10.003 10.003 0 0124 26c4.21 0 7.813 2.602 9.288 6.286M30 14a6 6 0 11-12 0 6 6 0 0112 0zm12 6a4 4 0 11-8 0 4 4 0 018 0zm-28 0a4 4 0 11-8 0 4 4 0 018 0z" />
 			</svg>
 			<p class="mt-2 text-sm text-gray-500">Carregando clientes...</p>
 		</div>
@@ -202,8 +229,11 @@
 								Contato
 							</th>
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-								Documento
+								Endereço
 							</th>
+							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+								Documento
+							</th>							
 							<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
 								Cadastro
 							</th>
@@ -317,20 +347,43 @@
 									</svg>
 								</button>
 								
-								{#each Array.from({length: customersData.pagination.pages}, (_, i) => i + 1) as page}
-									{#if page === currentPage}
-										<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
-											{page}
-										</span>
-									{:else}
-										<button
-											on:click={() => changePage(page)}
-											class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-										>
-											{page}
-										</button>
-									{/if}
-								{/each}
+								{#if customersData.pagination.pages <= 7}
+									<!-- Para 7 ou menos páginas, mostrar todas normalmente -->
+									{#each Array.from({length: customersData.pagination.pages}, (_, i) => i + 1) as page}
+										{#if page === currentPage}
+											<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
+												{page}
+											</span>
+										{:else}
+											<button
+												on:click={() => changePage(page)}
+												class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+											>
+												{page}
+											</button>
+										{/if}
+									{/each}
+								{:else}
+									<!-- Para mais de 7 páginas, usar paginação com elipses -->
+									{#each generatePageNumbers(currentPage, customersData.pagination.pages) as page}
+										{#if page === '...'}
+											<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+												...
+											</span>
+										{:else if page === currentPage}
+											<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
+												{page}
+											</span>
+										{:else}
+											<button
+												on:click={() => changePage(page as number)}
+												class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+											>
+												{page}
+											</button>
+										{/if}
+									{/each}
+								{/if}
 
 								<button
 									on:click={() => changePage(currentPage + 1)}
