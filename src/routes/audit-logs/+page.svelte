@@ -557,6 +557,7 @@
                           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {#each formatDataAsFields(selectedLog.originalData) as field}
                               <div class="border-b border-gray-100 pb-2">
+                                <!-- svelte-ignore a11y_label_has_associated_control -->
                                 <label class="text-xs font-medium text-gray-500 block">{field.key}</label>
                                 <p class="text-sm text-gray-900 break-words">
                                   {field.value === null ? 'null' : 
@@ -580,6 +581,7 @@
                           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {#each formatDataAsFields(selectedLog.newData) as field}
                               <div class="border-b border-gray-100 pb-2">
+                                <!-- svelte-ignore a11y_label_has_associated_control -->
                                 <label class="text-xs font-medium text-gray-500 block">{field.key}</label>
                                 <p class="text-sm text-gray-900 break-words">
                                   {field.value === null ? 'null' : 
