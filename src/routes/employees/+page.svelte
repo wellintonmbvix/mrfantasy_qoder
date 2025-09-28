@@ -62,6 +62,33 @@
 		});
 	}
 
+	// Função para gerar páginas com elipses
+	function generatePageNumbers(current: number, total: number): (number | '...')[] {
+		const delta = 2; // Número de páginas ao redor da página atual
+		const range: (number | '...')[] = [];
+		const rangeWithDots: (number | '...')[] = [];
+
+		for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
+			range.push(i);
+		}
+
+		if (current - delta > 2) {
+			rangeWithDots.push(1, '...');
+		} else {
+			rangeWithDots.push(1);
+		}
+
+		rangeWithDots.push(...range);
+
+		if (current + delta < total - 1) {
+			rangeWithDots.push('...', total);
+		} else if (total > 1) {
+			rangeWithDots.push(total);
+		}
+
+		return rangeWithDots;
+	}
+
 	function openCreateForm() {
 		if (!canManage) return;
 		editingEmployee = null;
@@ -402,16 +429,21 @@
 									</svg>
 								</button>
 
-								{#each Array(pagination.pages) as _, i}
-									{@const pageNum = i + 1}
-									<button
-										on:click={() => handlePageChange(pageNum)}
-										class="relative inline-flex items-center px-4 py-2 border text-sm font-medium {pageNum === currentPage 
-											? 'z-10 bg-blue-50 border-blue-500 text-blue-600' 
-											: 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}"
-									>
-										{pageNum}
-									</button>
+								{#each generatePageNumbers(currentPage, pagination.pages) as page}
+									{#if page === '...'}
+										<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+											...
+										</span>
+									{:else}
+										<button
+											on:click={() => handlePageChange(page as number)}
+											class="relative inline-flex items-center px-4 py-2 border text-sm font-medium {page === currentPage 
+												? 'z-10 bg-blue-50 border-blue-500 text-blue-600' 
+												: 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}"
+										>
+											{page}
+										</button>
+									{/if}
 								{/each}
 
 								<button

@@ -71,6 +71,33 @@
 		goto(url.toString());
 	}
 
+	// Função para gerar páginas com elipses
+	function generatePageNumbers(current: number, total: number): (number | '...')[] {
+		const delta = 2; // Número de páginas ao redor da página atual
+		const range: (number | '...')[] = [];
+		const rangeWithDots: (number | '...')[] = [];
+
+		for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
+			range.push(i);
+		}
+
+		if (current - delta > 2) {
+			rangeWithDots.push(1, '...');
+		} else {
+			rangeWithDots.push(1);
+		}
+
+		rangeWithDots.push(...range);
+
+		if (current + delta < total - 1) {
+			rangeWithDots.push('...', total);
+		} else if (total > 1) {
+			rangeWithDots.push(total);
+		}
+
+		return rangeWithDots;
+	}
+
 	function openCreateModal() {
 		uiStore.openUserForm();
 	}
@@ -434,13 +461,17 @@
 								</button>
 
 								<!-- Page Numbers -->
-								{#each Array.from({length: Math.min(5, pagination.pages)}, (_, i) => i + Math.max(1, currentPage - 2)) as pageNum}
-									{#if pageNum <= pagination.pages}
+								{#each generatePageNumbers(currentPage, pagination.pages) as page}
+									{#if page === '...'}
+										<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+											...
+										</span>
+									{:else}
 										<button
-											on:click={() => handlePageChange(pageNum)}
-											class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 {pageNum === currentPage ? 'bg-primary-50 border-primary-500 text-primary-600' : ''}"
+											on:click={() => handlePageChange(page as number)}
+											class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 {page === currentPage ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : ''}"
 										>
-											{pageNum}
+											{page}
 										</button>
 									{/if}
 								{/each}

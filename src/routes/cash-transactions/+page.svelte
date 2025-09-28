@@ -158,6 +158,33 @@
 		await cashTransactionActions.fetchTransactions({ ...currentFilters, page });
 	}
 
+	// Função para gerar páginas com elipses (replicada do componente de clientes)
+	function generatePageNumbers(current: number, total: number): (number | '...')[] {
+		const delta = 2; // Número de páginas ao redor da página atual
+		const range: (number | '...')[] = [];
+		const rangeWithDots: (number | '...')[] = [];
+
+		for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
+			range.push(i);
+		}
+
+		if (current - delta > 2) {
+			rangeWithDots.push(1, '...');
+		} else {
+			rangeWithDots.push(1);
+		}
+
+		rangeWithDots.push(...range);
+
+		if (current + delta < total - 1) {
+			rangeWithDots.push('...', total);
+		} else if (total > 1) {
+			rangeWithDots.push(total);
+		}
+
+		return rangeWithDots;
+	}
+
 	function openCancelModal(transactionId: number) {
 		selectedTransactionId = transactionId;
 		cancelReason = '';
@@ -578,14 +605,14 @@
 					</div>
 					<div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
 						<div>
-								<p class="text-sm text-gray-700">
-									Mostrando <span class="font-medium">{(($cashTransactions.pagination?.page || 1) - 1) * ($cashTransactions.pagination?.limit || 10) + 1}</span>
-									até <span class="font-medium">{Math.min(($cashTransactions.pagination?.page || 1) * ($cashTransactions.pagination?.limit || 10), $cashTransactions.pagination?.total || 0)}</span>
-									de <span class="font-medium">{$cashTransactions.pagination?.total || 0}</span> resultados
-								</p>
+							<p class="text-sm text-gray-700">
+								Mostrando <span class="font-medium">{(($cashTransactions.pagination?.page || 1) - 1) * ($cashTransactions.pagination?.limit || 10) + 1}</span>
+								até <span class="font-medium">{Math.min(($cashTransactions.pagination?.page || 1) * ($cashTransactions.pagination?.limit || 10), $cashTransactions.pagination?.total || 0)}</span>
+								de <span class="font-medium">{$cashTransactions.pagination?.total || 0}</span> resultados
+							</p>
 						</div>
 						<div>
-							<nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+							<nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
 								<button
 									on:click={() => changePage(($cashTransactions.pagination?.page || 1) - 1)}
 									disabled={($cashTransactions.pagination?.page || 1) <= 1 || $cashTransactions.loading}
@@ -597,20 +624,43 @@
 									</svg>
 								</button>
 								
-								{#each Array.from({length: Math.min($cashTransactions.pagination?.pages || 1, 5)}, (_, i) => i + 1) as page}
-									{#if page === ($cashTransactions.pagination?.page || 1)}
-										<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
-											{page}
-										</span>
-									{:else}
-										<button
-											on:click={() => changePage(page)}
-											class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-										>
-											{page}
-										</button>
-									{/if}
-								{/each}
+								{#if $cashTransactions.pagination?.pages && $cashTransactions.pagination.pages <= 7}
+									<!-- Para 7 ou menos páginas, mostrar todas normalmente -->
+									{#each Array.from({ length: $cashTransactions.pagination.pages }, (_, i) => i + 1) as pageNum}
+										{#if pageNum === ($cashTransactions.pagination?.page || 1)}
+											<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
+												{pageNum}
+											</span>
+										{:else}
+											<button
+												on:click={() => changePage(pageNum)}
+												class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+											>
+												{pageNum}
+											</button>
+										{/if}
+									{/each}
+								{:else}
+									<!-- Para mais de 7 páginas, usar paginação com elipses -->
+									{#each generatePageNumbers($cashTransactions.pagination?.page || 1, $cashTransactions.pagination?.pages || 1) as page}
+										{#if page === '...'}
+											<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+												...
+											</span>
+										{:else if page === ($cashTransactions.pagination?.page || 1)}
+											<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
+												{page}
+											</span>
+										{:else}
+											<button
+												on:click={() => changePage(page as number)}
+												class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+											>
+												{page}
+											</button>
+										{/if}
+									{/each}
+								{/if}
 
 								<button
 									on:click={() => changePage(($cashTransactions.pagination?.page || 1) + 1)}

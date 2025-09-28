@@ -41,6 +41,33 @@
 		params.set('page', newPage.toString());
 		goto(`/payment-methods?${params.toString()}`, { replaceState: true });
 	}
+
+	// Função para gerar páginas com elipses
+	function generatePageNumbers(current: number, total: number): (number | '...')[] {
+		const delta = 2; // Número de páginas ao redor da página atual
+		const range: (number | '...')[] = [];
+		const rangeWithDots: (number | '...')[] = [];
+
+		for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
+			range.push(i);
+		}
+
+		if (current - delta > 2) {
+			rangeWithDots.push(1, '...');
+		} else {
+			rangeWithDots.push(1);
+		}
+
+		rangeWithDots.push(...range);
+
+		if (current + delta < total - 1) {
+			rangeWithDots.push('...', total);
+		} else if (total > 1) {
+			rangeWithDots.push(total);
+		}
+
+		return rangeWithDots;
+	}
 	
 	// Handle create new payment method
 	function handleCreatePaymentMethod() {
@@ -328,14 +355,14 @@
 				<button
 					on:click={() => handlePagination(pagination.page - 1)}
 					disabled={pagination.page === 1}
-					class="btn btn-secondary"
+					class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
 				>
 					Anterior
 				</button>
 				<button
 					on:click={() => handlePagination(pagination.page + 1)}
 					disabled={pagination.page === pagination.pages}
-					class="btn btn-secondary"
+					class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
 				>
 					Próximo
 				</button>
@@ -349,34 +376,65 @@
 					</p>
 				</div>
 				<div>
-					<nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+					<nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
 						<button
 							on:click={() => handlePagination(pagination.page - 1)}
 							disabled={pagination.page === 1}
-							class="btn btn-secondary rounded-l-md"
+							class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
 						>
-							Anterior
+							<span class="sr-only">Anterior</span>
+							<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+								<path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+							</svg>
 						</button>
-						{#each Array.from({ length: pagination.pages }, (_, i) => i + 1) as pageNum}
-							{#if pageNum === pagination.page}
-								<span class="bg-indigo-50 border-indigo-500 text-indigo-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-									{pageNum}
-								</span>
-							{:else}
-								<button
-									on:click={() => handlePagination(pageNum)}
-									class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium"
-								>
-									{pageNum}
-								</button>
-							{/if}
-						{/each}
+						
+						{#if pagination.pages <= 7}
+							<!-- Para 7 ou menos páginas, mostrar todas normalmente -->
+							{#each Array.from({ length: pagination.pages }, (_, i) => i + 1) as pageNum}
+								{#if pageNum === pagination.page}
+									<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
+										{pageNum}
+									</span>
+								{:else}
+									<button
+										on:click={() => handlePagination(pageNum)}
+										class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+									>
+										{pageNum}
+									</button>
+								{/if}
+							{/each}
+						{:else}
+							<!-- Para mais de 7 páginas, usar paginação com elipses -->
+							{#each generatePageNumbers(pagination.page, pagination.pages) as page}
+								{#if page === '...'}
+									<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+										...
+									</span>
+								{:else if page === pagination.page}
+									<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
+										{page}
+									</span>
+								{:else}
+									<button
+										on:click={() => handlePagination(page as number)}
+										class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+									>
+										{page}
+									</button>
+								{/if}
+							{/each}
+						{/if}
+
 						<button
 							on:click={() => handlePagination(pagination.page + 1)}
 							disabled={pagination.page === pagination.pages}
-							class="btn btn-secondary rounded-r-md"
+							class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
 						>
-							Próximo
+							<span class="sr-only">Próximo</span>
+							<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+								<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+							</svg>
 						</button>
 					</nav>
 				</div>

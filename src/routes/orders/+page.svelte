@@ -96,6 +96,33 @@
 		loadOrders();
 	}
 
+	// Função para gerar páginas com elipses
+	function generatePageNumbers(current: number, total: number): (number | '...')[] {
+		const delta = 2; // Número de páginas ao redor da página atual
+		const range: (number | '...')[] = [];
+		const rangeWithDots: (number | '...')[] = [];
+
+		for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
+			range.push(i);
+		}
+
+		if (current - delta > 2) {
+			rangeWithDots.push(1, '...');
+		} else {
+			rangeWithDots.push(1);
+		}
+
+		rangeWithDots.push(...range);
+
+		if (current + delta < total - 1) {
+			rangeWithDots.push('...', total);
+		} else if (total > 1) {
+			rangeWithDots.push(total);
+		}
+
+		return rangeWithDots;
+	}
+
 	function getStatusColor(status: string) {
 		switch (status) {
 			case 'PENDING':
@@ -515,15 +542,15 @@
 									</svg>
 								</button>
 								
-								{#each Array.from({length: Math.min(ordersData.pagination.pages, 5)}, (_, i) => i + 1) as page}
-									{#if page === currentPage}
-										<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
-											{page}
+								{#each generatePageNumbers(currentPage, ordersData.pagination.pages) as page}
+									{#if page === '...'}
+										<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+											...
 										</span>
 									{:else}
 										<button
-											on:click={() => changePage(page)}
-											class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+											on:click={() => changePage(page as number)}
+											class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 {page === currentPage ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : ''}"
 										>
 											{page}
 										</button>

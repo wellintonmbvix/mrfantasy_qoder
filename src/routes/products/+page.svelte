@@ -165,28 +165,35 @@
 	}
 
 	function changePage(page: number) {
-		// Garantir que a página esteja dentro dos limites válidos
-		if (productsData.pagination) {
-			page = Math.max(1, Math.min(page, productsData.pagination.pages));
-		}
-		
-		if (page !== currentPage) {
-			currentPage = page;
-			loadProducts();
-			
-			// Forçar a atualização do estado
-			productsData = $products;
-		}
+		currentPage = page;
+		loadProducts();
 	}
 
-	// Função auxiliar para verificar se está na última página
-	function isLastPage() {
-		return productsData.pagination && currentPage >= productsData.pagination.pages;
-	}
+	// Função para gerar páginas com elipses
+	function generatePageNumbers(current: number, total: number): (number | '...')[] {
+		const delta = 2; // Número de páginas ao redor da página atual
+		const range: (number | '...')[] = [];
+		const rangeWithDots: (number | '...')[] = [];
 
-	// Função auxiliar para verificar se está na primeira página
-	function isFirstPage() {
-		return currentPage <= 1;
+		for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
+			range.push(i);
+		}
+
+		if (current - delta > 2) {
+			rangeWithDots.push(1, '...');
+		} else {
+			rangeWithDots.push(1);
+		}
+
+		rangeWithDots.push(...range);
+
+		if (current + delta < total - 1) {
+			rangeWithDots.push('...', total);
+		} else if (total > 1) {
+			rangeWithDots.push(total);
+		}
+
+		return rangeWithDots;
 	}
 
 	function getStockStatusColor(stockQuantity: number) {
@@ -413,7 +420,7 @@
 
 				<!-- Pagination -->
 				{#if productsData.pagination && productsData.pagination.pages > 1}
-					<div class="flex items-center justify-between">
+					<div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
 						<div class="flex-1 flex justify-between sm:hidden">
 							<button
 								on:click={() => changePage(currentPage - 1)}
@@ -439,7 +446,7 @@
 								</p>
 							</div>
 							<div>
-								<nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+								<nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
 									<button
 										on:click={() => changePage(currentPage - 1)}
 										disabled={currentPage <= 1}
@@ -451,24 +458,47 @@
 										</svg>
 									</button>
 									
-									{#each Array.from({length: Math.min(productsData.pagination.pages, 5)}, (_, i) => i + 1) as page}
-										{#if page === currentPage}
-											<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
-												{page}
-											</span>
-										{:else}
-											<button
-												on:click={() => changePage(page)}
-												class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-											>
-												{page}
-											</button>
-										{/if}
-									{/each}
+									{#if productsData.pagination.pages <= 7}
+										<!-- Para 7 ou menos páginas, mostrar todas normalmente -->
+										{#each Array.from({length: productsData.pagination.pages}, (_, i) => i + 1) as page}
+											{#if page === currentPage}
+												<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
+													{page}
+												</span>
+											{:else}
+												<button
+													on:click={() => changePage(page)}
+													class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+												>
+													{page}
+												</button>
+											{/if}
+										{/each}
+									{:else}
+										<!-- Para mais de 7 páginas, usar paginação com elipses -->
+										{#each generatePageNumbers(currentPage, productsData.pagination.pages) as page}
+											{#if page === '...'}
+												<span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+													...
+												</span>
+											{:else if page === currentPage}
+												<span class="relative inline-flex items-center px-4 py-2 border border-primary-500 bg-primary-50 text-sm font-medium text-primary-600">
+													{page}
+												</span>
+											{:else}
+												<button
+													on:click={() => changePage(page as number)}
+													class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+												>
+													{page}
+												</button>
+											{/if}
+										{/each}
+									{/if}
 
 									<button
 										on:click={() => changePage(currentPage + 1)}
-										disabled={currentPage >= productsData.pagination.pages || productsData.pagination.pages <= 1}
+										disabled={currentPage >= productsData.pagination.pages}
 										class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
 									>
 										<span class="sr-only">Próximo</span>
