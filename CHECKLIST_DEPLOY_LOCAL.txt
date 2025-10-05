@@ -1,0 +1,84 @@
+✅ CHECKLIST DE DEPLOY LOCAL (PRODUÇÃO) — mrfantasy
+===================================================
+
+🧑‍💻 ETAPA 1: NO AMBIENTE DE DESENVOLVIMENTO
+--------------------------------------------
+
+🔹 [ ] Atualize o arquivo .env com variáveis de produção
+
+    NODE_ENV=production
+    PORT=3000
+    HOST=127.0.0.1
+    DATABASE_URL="mysql://usuario:senha@localhost:3306/nome_do_banco"
+    JWT_SECRET="sua_chave_secreta"
+
+🔹 [ ] Execute os comandos para gerar o build da aplicação
+
+    npm ci
+    npm run db:generate
+    npm run build
+
+🔹 [ ] Crie a pasta de produção `dist/` e copie os arquivos essenciais:
+
+    mkdir dist
+    cp -r build dist/
+    cp -r prisma dist/
+    cp package.json dist/
+    cp package-lock.json dist/
+    cp .env dist/
+
+    ⚠️ Não copie pastas como `src/`, `tests/`, nem arquivos de desenvolvimento.
+
+🔹 [ ] (Opcional) Crie um script `start.bat` com o conteúdo abaixo:
+
+    @echo off
+    cd /d C:\mrfantasy
+    node build
+
+
+🖥️ ETAPA 2: NO COMPUTADOR DE PRODUÇÃO
+--------------------------------------
+
+🔹 [ ] Instale os pré-requisitos:
+
+    - Node.js (mesma versão usada no desenvolvimento)
+    - MySQL (com banco criado e configurado)
+
+🔹 [ ] Copie o conteúdo da pasta `dist/` para o diretório desejado, exemplo:
+
+    C:\mrfantasy\
+
+    Estrutura esperada:
+    ├── .env
+    ├── package.json
+    ├── package-lock.json
+    ├── prisma\
+    ├── build\
+    └── start.bat  (opcional)
+
+🔹 [ ] Instale as dependências de produção:
+
+    cd C:\mrfantasy
+    npm ci --omit=dev
+
+🔹 [ ] Gere o Prisma Client:
+
+    npm run db:generate
+
+🔹 [ ] Aplique as migrations no banco de dados:
+
+    npm run db:migrate
+
+🔹 [ ] Inicie a aplicação:
+
+    npm start
+    ou
+    start.bat
+
+🎉 RESULTADO FINAL
+------------------
+
+✅ Aplicação rodando em modo produção
+✅ Sem arquivos de desenvolvimento expostos
+✅ Conectada ao banco de dados local (MySQL)
+✅ Pronta para ser automatizada na inicialização do Windows
