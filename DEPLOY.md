@@ -44,11 +44,8 @@ Ao final, a pasta `release_build/` estará pronta para ser usada pelo cliente se
    - npm disponível
    - Arquivo `.env` configurado corretamente
    - Pasta `prisma/` com `schema.prisma` e seeds
-3. Execute o script:
-
-```bat
-deploy.bat
-4. Aguarde o processo completar. Ao final, você verá a mensagem:
+3. Execute o script: deploy.bat
+4. Aguarde o processo completar. Ao final, você verá a mensagem: 
 ✔ Deploy finalizado com sucesso!
 Pasta gerada: release_build
 5. Para rodar a aplicação no cliente:
