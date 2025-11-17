@@ -1,56 +1,88 @@
-# Script de Deploy - Svelte + Prisma
+@echo off
+setlocal enabledelayedexpansion
 
-Este repositório inclui um script de deploy automatizado (`deploy.bat`) que prepara uma versão final da aplicação Svelte com Prisma para ser distribuída a clientes, sem expor o código-fonte completo.
+echo =================================================
+echo      🚀 Iniciando processo de Deploy do Svelte
+echo =================================================
 
-O objetivo do script é gerar a **pasta de release final** (`release_build/`) contendo:
+REM 1) Criar pasta temporária
+echo → Criando pasta temporaria: deploy_temp
+rmdir /s /q deploy_temp 2>nul
+mkdir deploy_temp
 
-- Build compilado da aplicação (`build/`)
-- Dependências corretas em `node_modules/` (incluindo o Prisma Client)
-- Arquivo `.env` com variáveis de ambiente
-- `package.json` mínimo para execução (`npm start`)
+REM 2) Copiar prisma e package.json
+echo → Copiando arquivos essenciais para deploy_temp
+xcopy prisma deploy_temp\prisma /E /I /Y >nul
+copy package.json deploy_temp\ /Y >nul
+if exist package-lock.json copy package-lock.json deploy_temp\ /Y >nul
+if exist .env copy .env deploy_temp\ /Y >nul
 
----
+REM 3) Instalar dependencias
+echo → Instalando dependencias (npm install)
+cd deploy_temp
+npm install
 
-## O que o `deploy.bat` faz
+REM 4) Rodar migracoes
+echo → Aplicando migracoes (prisma migrate deploy)
+npx prisma migrate deploy
 
-O script executa automaticamente os seguintes passos:
+REM 5) Gerar Prisma Client
+echo → Gerando Prisma Client (prisma generate)
+npx prisma generate
 
-1. **Cria uma pasta temporária** (`deploy_temp`) para gerar dependências e o Prisma Client.
-2. **Copia arquivos essenciais** para a pasta temporária:
-   - `prisma/` (contendo schema e seeds)
-   - `package.json` e `package-lock.json`
-   - `.env`
-3. **Instala todas as dependências** (`npm install`) dentro da pasta temporária.
-4. **Aplica migrações** no banco de dados com `npx prisma migrate deploy`.
-5. **Gera o Prisma Client** com `npx prisma generate`.
-6. **Executa o seed** inicial do banco (`npx prisma db seed`).
-7. **Gera o build final da aplicação** (`npm run build`).
-8. **Cria a pasta final de entrega** (`release_build/`) limpa.
-9. **Copia o build** para a pasta de release.
-10. **Copia o `node_modules` correto** (com Prisma Client) para a pasta de release.
-11. **Copia o arquivo `.env`** para a pasta de release.
-12. **Gera um `package.json` simplificado** de produção dentro da pasta de release.
-13. **Remove a pasta temporária** usada durante o deploy.
+REM 6) Rodar seed
+echo → Executando seed (prisma db seed)
+npx prisma db seed
 
-Ao final, a pasta `release_build/` estará pronta para ser usada pelo cliente sem necessidade de compilar ou rodar comandos adicionais de Prisma.
+REM 7) Voltar ao projeto raiz e gerar build final
+cd ..
+echo → Gerando build final (npm run build)
+npm run build
 
----
+REM 8) Criar pasta final de entrega
+echo → Criando pasta release_build
+rmdir /s /q release_build 2>nul
+mkdir release_build
 
-## Como usar o `deploy.bat`
+REM 9) Copiar build gerado
+echo → Copiando build/ para release_build/
+xcopy build release_build\build /E /I /Y >nul
 
-1. Coloque o arquivo `deploy.bat` na raiz do seu projeto.
-2. Certifique-se de que você tem:
-   - Node.js instalado
-   - npm disponível
-   - Arquivo `.env` configurado corretamente
-   - Pasta `prisma/` com `schema.prisma` e seeds
-3. Execute o script:
+REM 10) Copiar node_modules do deploy_temp (com Prisma Client)
+echo → Copiando node_modules corretos
+xcopy deploy_temp\node_modules release_build\node_modules /E /I /Y >nul
 
-```bat
-deploy.bat
-4. Aguarde o processo completar. Ao final, você verá a mensagem:
-✔ Deploy finalizado com sucesso!
-Pasta gerada: release_build
-5. Para rodar a aplicação no cliente:
-cd release_build
-npm start
+REM 11) Copiar .env
+echo → Copiando .env
+copy .env release_build\ /Y >nul
+
+REM 12) Criar package.json de produção
+echo → Criando package.json de producao
+(
+echo {
+echo   "name": "mrfantasy",
+echo   "version": "1.0.0",
+echo   "main": "build/index.js",
+echo   "scripts": {
+echo     "start": "node build/index.js"
+echo   },
+echo   "type": "module",
+echo   "dependencies": {
+echo     "@prisma/client": "^5.22.0",
+echo     "bcrypt": "^6.0.0",
+echo     "bcryptjs": "^2.4.3",
+echo     "jsonwebtoken": "^9.0.2",
+echo     "zod": "^3.22.4"
+echo   }
+echo }
+) > release_build\package.json
+
+REM 13) Limpar pasta temporária
+echo → Removendo pasta temporaria
+rmdir /s /q deploy_temp
+
+echo =================================================
+echo      ✔ Deploy finalizado com sucesso!
+echo      Pasta gerada:  release_build
+echo =================================================
+pause
